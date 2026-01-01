@@ -504,6 +504,16 @@
             formData.append(CONFIG.formFields.longitude, capturedData.longitude.toString());
             formData.append(CONFIG.formFields.timestamp, capturedData.timestamp);
 
+            // DEBUG: Log what we're sending
+            console.log('=== FORM SUBMISSION DEBUG ===');
+            console.log('Form URL:', CONFIG.formActionUrl);
+            console.log('Team Name field:', CONFIG.formFields.teamName, '=', currentTeam);
+            console.log('Photo URL field:', CONFIG.formFields.photoUrl, '=', photoUrl);
+            console.log('Latitude field:', CONFIG.formFields.latitude, '=', capturedData.latitude);
+            console.log('Longitude field:', CONFIG.formFields.longitude, '=', capturedData.longitude);
+            console.log('Timestamp field:', CONFIG.formFields.timestamp, '=', capturedData.timestamp);
+            console.log('=== END DEBUG ===');
+
             await fetch(CONFIG.formActionUrl, {
                 method: 'POST',
                 body: formData,
