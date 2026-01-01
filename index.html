@@ -1,554 +1,121 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Team Photo Submission</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-        }
-
-        .container {
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            max-width: 500px;
-            width: 100%;
-            margin: 0 auto;
-            padding: 30px;
-        }
-
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-
-        h1 {
-            color: #333;
-            font-size: 28px;
-            margin-bottom: 10px;
-        }
-
-        .team-badge {
-            display: inline-block;
-            padding: 10px 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-radius: 25px;
-            font-weight: 600;
-            font-size: 18px;
-            margin: 10px 0;
-        }
-
-        .subtitle {
-            color: #666;
-            font-size: 14px;
-        }
-
-        .camera-section {
-            margin: 20px 0;
-        }
-
-        #videoElement {
-            width: 100%;
-            border-radius: 10px;
-            background: #000;
-            display: none;
-        }
-
-        #canvas {
-            display: none;
-        }
-
-        .preview-container {
-            margin-bottom: 20px;
-        }
-
-        #preview {
-            width: 100%;
-            border-radius: 10px;
-            display: none;
-        }
-
-        .location-info {
-            background: #f5f5f5;
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            display: none;
-        }
-
-        .location-info h3 {
-            color: #333;
-            font-size: 16px;
-            margin-bottom: 10px;
-        }
-
-        .location-info p {
-            color: #666;
-            font-size: 14px;
-            margin: 5px 0;
-        }
-
-        .button {
-            width: 100%;
-            padding: 15px;
-            border: none;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-            margin-bottom: 10px;
-        }
-
-        .button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .button-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-
-        .button-primary:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
-        }
-
-        .button-secondary {
-            background: #e0e0e0;
-            color: #333;
-        }
-
-        .button-secondary:hover:not(:disabled) {
-            background: #d0d0d0;
-        }
-
-        .button-success {
-            background: #4CAF50;
-            color: white;
-        }
-
-        .button-success:hover:not(:disabled) {
-            background: #45a049;
-            transform: translateY(-2px);
-        }
-
-        .status {
-            padding: 12px;
-            border-radius: 8px;
-            margin-bottom: 15px;
-            font-size: 14px;
-            display: none;
-        }
-
-        .status.error {
-            background: #ffebee;
-            color: #c62828;
-            display: block;
-        }
-
-        .status.success {
-            background: #e8f5e9;
-            color: #2e7d32;
-            display: block;
-        }
-
-        .status.info {
-            background: #e3f2fd;
-            color: #1565c0;
-            display: block;
-        }
-
-        .spinner {
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #667eea;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 20px auto;
-            display: none;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Team Photo Challenge</title>
 </head>
+
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>📸 Team Photo Challenge</h1>
-            <div class="team-badge" id="teamBadge">Validating...</div>
-            <p class="subtitle">Capture and submit photos with location</p>
-        </div>
+  <h1>Team Photo Challenge</h1>
 
-        <div class="status" id="status"></div>
-        <div class="spinner" id="spinner"></div>
+  <label>Team Name:</label>
+  <input id="teamName" type="text" />
 
-        <div class="camera-section">
-            <video id="videoElement" autoplay playsinline></video>
-            <canvas id="canvas"></canvas>
-            <div class="preview-container">
-                <img id="preview" alt="Captured photo">
-            </div>
-        </div>
+  <br><br>
 
-        <div class="location-info" id="locationInfo">
-            <h3>📍 Location Captured</h3>
-            <p id="coordinates"></p>
-            <p id="timestamp"></p>
-        </div>
+  <label>Take Photo:</label>
+  <input id="photoInput" type="file" accept="image/*" capture="environment" />
 
-        <button id="captureBtn" class="button button-primary" style="display: none;">📷 Start Camera</button>
-        <button id="retakeBtn" class="button button-secondary" style="display: none;">🔄 Retake Photo</button>
-        <button id="submitBtn" class="button button-success" style="display: none;">✅ Submit Photo</button>
-    </div>
+  <br><br>
 
-    <script type="module">
-        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-        import { getStorage, ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
-        import { getDatabase, ref as dbRef, get } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+  <button id="submitBtn">Submit</button>
 
-        // CONFIGURATION - Replace with your values
-        const CONFIG = {
-            firebase: {
-                apiKey: "AIzaSyC2u62B4yUyLJmLH1IdI8tJEp6iHruPH0A",
-                authDomain: "team-photo-challenge.firebaseapp.com",
-                projectId: "team-photo-challenge",
-                storageBucket: "team-photo-challenge.firebasestorage.app",
-                messagingSenderId: "818498843878",
-                appId: "1:818498843878:web:c94a7e2f46798277c9f727",
-                databaseURL: "https://team-photo-challenge-default-rtdb.firebaseio.com/"
-            },
-            formActionUrl: 'https://docs.google.com/forms/u/0/d/e/1FAIpQLSe-0a9XtwNmnbQ3g0eV9ju7LRO1r6s9HZdimApZhY9jdIJeVw/formResponse',
-            formFields: {
-                teamName: 'entry.1461860895',
-                photoUrl: 'entry.948034043',
-                latitude: 'entry.840940889',
-                longitude: 'entry.394950311',
-                timestamp: 'entry.887644534'
-            }
-        };
+  <script type="module">
+    /* ---------------------------------------------------------
+       1. Firebase Initialization (Verified)
+    --------------------------------------------------------- */
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getStorage, ref as storageRef, uploadBytes, getDownloadURL }
+      from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
+    import { getDatabase, ref, push, set }
+      from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-        const video = document.getElementById('videoElement');
-        const canvas = document.getElementById('canvas');
-        const preview = document.getElementById('preview');
-        const captureBtn = document.getElementById('captureBtn');
-        const retakeBtn = document.getElementById('retakeBtn');
-        const submitBtn = document.getElementById('submitBtn');
-        const status = document.getElementById('status');
-        const locationInfo = document.getElementById('locationInfo');
-        const spinner = document.getElementById('spinner');
-        const teamBadge = document.getElementById('teamBadge');
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT.firebaseapp.com",
+      databaseURL: "https://YOUR_PROJECT.firebaseio.com",
+      projectId: "YOUR_PROJECT",
+      storageBucket: "YOUR_PROJECT.appspot.com",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
 
-        let stream = null;
-        let app = null;
-        let storage = null;
-        let database = null;
-        let currentTeam = null;
-        let currentToken = null;
+    const app = initializeApp(firebaseConfig);
+    const storage = getStorage(app);
+    const db = getDatabase(app);
 
-        let capturedData = {
-            photoBlob: null,
-            latitude: null,
-            longitude: null,
-            timestamp: null
-        };
+    /* ---------------------------------------------------------
+       2. Helper: Get GPS Location
+    --------------------------------------------------------- */
+    function getLocation() {
+      return new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+          pos => resolve({
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude
+          }),
+          err => reject(err)
+        );
+      });
+    }
 
-        function showStatus(message, type) {
-            status.textContent = message;
-            status.className = `status ${type}`;
-            status.style.display = 'block';
-            
-            if (type === 'success' || type === 'info') {
-                setTimeout(() => {
-                    status.style.display = 'none';
-                }, 5000);
-            }
-        }
+    /* ---------------------------------------------------------
+       3. Helper: Upload Photo to Firebase Storage
+    --------------------------------------------------------- */
+    async function uploadPhoto(file, teamName) {
+      const filePath = `photos/${teamName}/${Date.now()}.jpg`;
+      const fileRef = storageRef(storage, filePath);
 
-        function showSpinner(show) {
-            spinner.style.display = show ? 'block' : 'none';
-        }
+      await uploadBytes(fileRef, file);
+      return await getDownloadURL(fileRef);
+    }
 
-        async function initFirebase() {
-            try {
-                app = initializeApp(CONFIG.firebase);
-                storage = getStorage(app);
-                database = getDatabase(app);
-                return true;
-            } catch (err) {
-                showStatus(`Firebase initialization failed: ${err.message}`, 'error');
-                return false;
-            }
-        }
+    /* ---------------------------------------------------------
+       4. Save Submission to Realtime Database
+    --------------------------------------------------------- */
+    async function saveSubmissionToFirebase({ teamName, photoUrl, latitude, longitude }) {
+      const teamRef = ref(db, `submissions/${teamName}`);
+      const newEntry = push(teamRef);
 
-        async function validateToken(token) {
-            try {
-                showSpinner(true);
-                showStatus('Validating access token...', 'info');
-                
-                const tokenRef = dbRef(database, `tokens/${token}`);
-                const snapshot = await get(tokenRef);
-                
-                if (snapshot.exists()) {
-                    const data = snapshot.val();
-                    if (data.enabled !== false) {
-                        showSpinner(false);
-                        return data.teamName;
-                    }
-                }
-                
-                showSpinner(false);
-                return null;
-            } catch (err) {
-                showSpinner(false);
-                showStatus(`Validation error: ${err.message}`, 'error');
-                return null;
-            }
-        }
+      await set(newEntry, {
+        teamName,
+        photoUrl,
+        latitude,
+        longitude,
+        timestamp: Date.now()
+      });
+    }
 
-        async function initApp() {
-            const urlParams = new URLSearchParams(window.location.search);
-            currentToken = urlParams.get('token');
-            
-            if (!currentToken) {
-                teamBadge.textContent = '❌ No Token';
-                teamBadge.style.background = '#f44336';
-                showStatus('No access token provided. Please scan a valid QR code.', 'error');
-                return;
-            }
-            
-            const initialized = await initFirebase();
-            if (!initialized) {
-                teamBadge.textContent = '❌ Error';
-                teamBadge.style.background = '#f44336';
-                return;
-            }
-            
-            currentTeam = await validateToken(currentToken);
-            
-            if (!currentTeam) {
-                teamBadge.textContent = '❌ Invalid Token';
-                teamBadge.style.background = '#f44336';
-                showStatus('Invalid or disabled token. Please contact the event organizer.', 'error');
-                return;
-            }
-            
-            teamBadge.textContent = `🎯 ${currentTeam}`;
-            captureBtn.style.display = 'block';
-            showStatus(`Welcome, ${currentTeam}! Ready to capture photos.`, 'success');
-        }
+    /* ---------------------------------------------------------
+       5. Main Submit Handler
+    --------------------------------------------------------- */
+    document.getElementById("submitBtn").addEventListener("click", async () => {
+      const teamName = document.getElementById("teamName").value.trim();
+      const file = document.getElementById("photoInput").files[0];
 
-        async function startCamera() {
-            try {
-                showSpinner(true);
-                showStatus('Requesting camera access...', 'info');
-                
-                stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: 'environment' },
-                    audio: false 
-                });
-                
-                video.srcObject = stream;
-                video.style.display = 'block';
-                captureBtn.textContent = '📸 Capture Photo';
-                showStatus('Camera ready! Position your shot and click Capture.', 'success');
-                showSpinner(false);
-            } catch (err) {
-                showSpinner(false);
-                let errorMsg = 'Camera access error: ';
-                
-                if (err.name === 'NotAllowedError') {
-                    errorMsg += 'Permission denied. Please allow camera access in your browser settings.';
-                } else if (err.name === 'NotFoundError') {
-                    errorMsg += 'No camera found on this device.';
-                } else if (err.name === 'NotReadableError') {
-                    errorMsg += 'Camera is being used by another app.';
-                } else {
-                    errorMsg += err.message;
-                }
-                
-                showStatus(errorMsg, 'error');
-            }
-        }
+      if (!teamName || !file) {
+        alert("Please enter a team name and take a photo.");
+        return;
+      }
 
-        async function getLocation() {
-            return new Promise((resolve, reject) => {
-                if (!navigator.geolocation) {
-                    reject(new Error('Geolocation not supported'));
-                    return;
-                }
+      try {
+        const { latitude, longitude } = await getLocation();
+        const photoUrl = await uploadPhoto(file, teamName);
 
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        resolve({
-                            latitude: position.coords.latitude,
-                            longitude: position.coords.longitude
-                        });
-                    },
-                    (error) => {
-                        reject(new Error(`Location error: ${error.message}`));
-                    },
-                    {
-                        enableHighAccuracy: true,
-                        timeout: 10000,
-                        maximumAge: 0
-                    }
-                );
-            });
-        }
+        await saveSubmissionToFirebase({
+          teamName,
+          photoUrl,
+          latitude,
+          longitude
+        });
 
-        async function capturePhoto() {
-            if (!stream) {
-                await startCamera();
-                return;
-            }
-
-            try {
-                showSpinner(true);
-                showStatus('Capturing location...', 'info');
-
-                const location = await getLocation();
-                
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(video, 0, 0);
-                
-                const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-                const base64Data = dataUrl.split(',')[1];
-                const byteString = atob(base64Data);
-                const ab = new ArrayBuffer(byteString.length);
-                const ia = new Uint8Array(ab);
-                for (let i = 0; i < byteString.length; i++) {
-                    ia[i] = byteString.charCodeAt(i);
-                }
-                capturedData.photoBlob = new Blob([ab], { type: 'image/jpeg' });
-                
-                capturedData.latitude = location.latitude;
-                capturedData.longitude = location.longitude;
-                capturedData.timestamp = new Date().toISOString();
-
-                stream.getTracks().forEach(track => track.stop());
-                video.style.display = 'none';
-                stream = null;
-
-                preview.src = dataUrl;
-                preview.style.display = 'block';
-
-                document.getElementById('coordinates').textContent = 
-                    `Lat: ${location.latitude.toFixed(6)}, Lng: ${location.longitude.toFixed(6)}`;
-                document.getElementById('timestamp').textContent = 
-                    `Time: ${new Date(capturedData.timestamp).toLocaleString()}`;
-                locationInfo.style.display = 'block';
-
-                captureBtn.style.display = 'none';
-                retakeBtn.style.display = 'block';
-                submitBtn.style.display = 'block';
-
-                showStatus('Photo and location captured! Review and submit.', 'success');
-                showSpinner(false);
-
-            } catch (err) {
-                showSpinner(false);
-                showStatus(`Error: ${err.message}`, 'error');
-            }
-        }
-
-        function retake() {
-            preview.style.display = 'none';
-            locationInfo.style.display = 'none';
-            retakeBtn.style.display = 'none';
-            submitBtn.style.display = 'none';
-            captureBtn.style.display = 'block';
-            captureBtn.textContent = '📷 Start Camera';
-            capturedData = {
-                photoBlob: null,
-                latitude: null,
-                longitude: null,
-                timestamp: null
-            };
-        }
-
-        async function uploadToFirebase() {
-            const filename = `${currentTeam.replace(/\s+/g, '_')}_${Date.now()}.jpg`;
-            const storageRef = ref(storage, `photos/${filename}`);
-            
-            await uploadBytes(storageRef, capturedData.photoBlob);
-            const downloadURL = await getDownloadURL(storageRef);
-            
-            return downloadURL;
-        }
-
-        async function submitToGoogleForms(photoUrl) {
-            const formData = new FormData();
-            formData.append(CONFIG.formFields.teamName, currentTeam);
-            formData.append(CONFIG.formFields.photoUrl, photoUrl);
-            formData.append(CONFIG.formFields.latitude, capturedData.latitude.toString());
-            formData.append(CONFIG.formFields.longitude, capturedData.longitude.toString());
-            formData.append(CONFIG.formFields.timestamp, capturedData.timestamp);
-
-            // DEBUG: Log what we're sending
-            console.log('=== FORM SUBMISSION DEBUG ===');
-            console.log('Form URL:', CONFIG.formActionUrl);
-            console.log('Team Name field:', CONFIG.formFields.teamName, '=', currentTeam);
-            console.log('Photo URL field:', CONFIG.formFields.photoUrl, '=', photoUrl);
-            console.log('Latitude field:', CONFIG.formFields.latitude, '=', capturedData.latitude);
-            console.log('Longitude field:', CONFIG.formFields.longitude, '=', capturedData.longitude);
-            console.log('Timestamp field:', CONFIG.formFields.timestamp, '=', capturedData.timestamp);
-            console.log('=== END DEBUG ===');
-
-            await fetch(CONFIG.formActionUrl, {
-                method: 'POST',
-                body: formData,
-                mode: 'no-cors'
-            });
-        }
-
-        async function handleSubmit() {
-            try {
-                showSpinner(true);
-                showStatus('Uploading photo to Firebase...', 'info');
-
-                const photoUrl = await uploadToFirebase();
-                
-                showStatus('Submitting to Google Forms...', 'info');
-                await submitToGoogleForms(photoUrl);
-
-                showStatus(`✅ Successfully submitted for ${currentTeam}!`, 'success');
-                showSpinner(false);
-
-                setTimeout(() => {
-                    retake();
-                }, 3000);
-
-            } catch (err) {
-                showSpinner(false);
-                showStatus(`Submission error: ${err.message}`, 'error');
-            }
-        }
-
-        captureBtn.addEventListener('click', capturePhoto);
-        retakeBtn.addEventListener('click', retake);
-        submitBtn.addEventListener('click', handleSubmit);
-
-        initApp();
-    </script>
+        alert("Submission saved successfully!");
+      } catch (err) {
+        console.error(err);
+        alert("Something went wrong.");
+      }
+    });
+  </script>
 </body>
 </html>
