@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Team Photo Submission</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -12,7 +15,7 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            font-family: 'Nunito Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             padding: 20px;
@@ -183,6 +186,22 @@
             display: none;
         }
 
+                .button-container {
+            position: sticky;
+            bottom: 0;
+            background: white;
+            padding: 15px 0 0 0;
+            margin-top: 20px;
+            border-top: 2px solid #f0f0f0;
+            z-index: 100;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding-bottom:80px;
+            }
+        }
+
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
@@ -215,8 +234,10 @@
         </div>
 
         <button id="captureBtn" class="button button-primary" style="display: none;">📷 Start Camera</button>
-        <button id="retakeBtn" class="button button-secondary" style="display: none;">🔄 Retake Photo</button>
-        <button id="submitBtn" class="button button-success" style="display: none;">✅ Submit Photo</button>
+        <div class="button-container">
+            <button id="retakeBtn" class="button button-secondary" style="display: none;">🔄 Retake Photo</button>
+            <button id="submitBtn" class="button button-success" style="display: none;">✅ Submit Photo</button>
+        </div>
     </div>
 
     <script type="module">
@@ -452,7 +473,7 @@
 
             try {
                 showSpinner(true);
-                showStatus('Getting current location...', 'info');
+                showStatus('Capturing location...', 'info');
 
                 const location = await getLocation();
                 
@@ -552,7 +573,7 @@
                 showStatus('Saving submission to database...', 'info');
                 const submissionId = await saveSubmissionToDatabase(photoUrl);
 
-                showStatus(`✅ Successfully submitted for ${currentTeam}! (ID: ${submissionId})`, 'success');
+                showStatus(`✅ Successfully submitted for ${currentTeam}!`, 'success');
                 showSpinner(false);
 
                 setTimeout(() => {
