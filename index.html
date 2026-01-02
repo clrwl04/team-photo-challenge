@@ -4,9 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Team Photo Submission</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -15,7 +12,7 @@
         }
 
         body {
-            font-family: 'Nunito Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             padding: 20px;
@@ -186,22 +183,6 @@
             display: none;
         }
 
-                .button-container {
-            position: sticky;
-            bottom: 0;
-            background: white;
-            padding: 15px 0 0 0;
-            margin-top: 20px;
-            border-top: 2px solid #f0f0f0;
-            z-index: 100;
-        }
-
-        @media (max-width: 768px) {
-            body {
-                padding-bottom:80px;
-            }
-        }
-
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
@@ -234,10 +215,8 @@
         </div>
 
         <button id="captureBtn" class="button button-primary" style="display: none;">📷 Start Camera</button>
-        <div class="button-container">
-            <button id="retakeBtn" class="button button-secondary" style="display: none;">🔄 Retake Photo</button>
-            <button id="submitBtn" class="button button-success" style="display: none;">✅ Submit Photo</button>
-        </div>
+        <button id="retakeBtn" class="button button-secondary" style="display: none;">🔄 Retake Photo</button>
+        <button id="submitBtn" class="button button-success" style="display: none;">✅ Submit Photo</button>
     </div>
 
     <script type="module">
@@ -248,13 +227,13 @@
         // CONFIGURATION - Replace with your values
         const CONFIG = {
             firebase: {
-                apiKey: "AIzaSyC2u62B4yUyLJmLH1IdI8tJEp6iHruPH0A",
-                authDomain: "team-photo-challenge.firebaseapp.com",
-                projectId: "team-photo-challenge",
-                storageBucket: "team-photo-challenge.firebasestorage.app",
-                messagingSenderId: "818498843878",
-                appId: "1:818498843878:web:c94a7e2f46798277c9f727",
-                databaseURL: "https://team-photo-challenge-default-rtdb.firebaseio.com/"
+                apiKey: "YOUR_API_KEY",
+                authDomain: "YOUR_PROJECT.firebaseapp.com",
+                projectId: "YOUR_PROJECT_ID",
+                storageBucket: "YOUR_PROJECT.appspot.com",
+                messagingSenderId: "YOUR_SENDER_ID",
+                appId: "YOUR_APP_ID",
+                databaseURL: "https://YOUR_PROJECT.firebaseio.com"
             }
         };
 
@@ -473,7 +452,7 @@
 
             try {
                 showSpinner(true);
-                showStatus('Capturing location...', 'info');
+                showStatus('Getting current location...', 'info');
 
                 const location = await getLocation();
                 
@@ -573,7 +552,7 @@
                 showStatus('Saving submission to database...', 'info');
                 const submissionId = await saveSubmissionToDatabase(photoUrl);
 
-                showStatus(`✅ Successfully submitted for ${currentTeam}!`, 'success');
+                showStatus(`✅ Successfully submitted for ${currentTeam}! (ID: ${submissionId})`, 'success');
                 showSpinner(false);
 
                 setTimeout(() => {
