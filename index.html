@@ -222,18 +222,18 @@
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
         import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
-        import { getDatabase, ref as dbRef, get, push, set } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+        import { getDatabase, ref as dbRef, get, push, set, onValue, off } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
 
         // CONFIGURATION - Replace with your values
         const CONFIG = {
             firebase: {
-                apiKey: "AIzaSyC2u62B4yUyLJmLH1IdI8tJEp6iHruPH0A",
-                authDomain: "team-photo-challenge.firebaseapp.com",
-                projectId: "team-photo-challenge",
-                storageBucket: "team-photo-challenge.firebasestorage.app",
-                messagingSenderId: "818498843878",
-                appId: "1:818498843878:web:c94a7e2f46798277c9f727",
-                databaseURL: "hhttps://team-photo-challenge-default-rtdb.firebaseio.com/"
+                apiKey: "YOUR_API_KEY",
+                authDomain: "YOUR_PROJECT.firebaseapp.com",
+                projectId: "YOUR_PROJECT_ID",
+                storageBucket: "YOUR_PROJECT.appspot.com",
+                messagingSenderId: "YOUR_SENDER_ID",
+                appId: "YOUR_APP_ID",
+                databaseURL: "https://YOUR_PROJECT.firebaseio.com"
             }
         };
 
@@ -346,42 +346,63 @@
         }
 
         async function initApp() {
-            const urlParams = new URLSearchParams(window.location.search);
-            currentToken = urlParams.get('token');
-            
-            if (!currentToken) {
-                teamBadge.textContent = '❌ No Token';
-                teamBadge.style.background = '#f44336';
-                showStatus('No access token provided. Please scan a valid QR code.', 'error');
-                return;
-            }
-            
-            const initialized = await initFirebase();
-            if (!initialized) {
+            try {
+                teamBadge.textContent = 'Checking token...';
+                
+                const urlParams = new URLSearchParams(window.location.search);
+                currentToken = urlParams.get('token');
+                
+                if (!currentToken) {
+                    teamBadge.textContent = '❌ No Token';
+                    teamBadge.style.background = '#f44336';
+                    showStatus('No access token provided. Please scan a valid QR code.', 'error');
+                    console.error('No token in URL');
+                    return;
+                }
+                
+                console.log('Token found:', currentToken);
+                teamBadge.textContent = 'Connecting to Firebase...';
+                
+                const initialized = await initFirebase();
+                if (!initialized) {
+                    teamBadge.textContent = '❌ Firebase Error';
+                    teamBadge.style.background = '#f44336';
+                    console.error('Firebase initialization failed');
+                    return;
+                }
+                
+                console.log('Firebase initialized successfully');
+                teamBadge.textContent = 'Validating token...';
+                
+                currentTeam = await validateToken(currentToken);
+                
+                if (!currentTeam) {
+                    teamBadge.textContent = '❌ Invalid Token';
+                    teamBadge.style.background = '#f44336';
+                    showStatus('Invalid or disabled token. Please contact the event organizer.', 'error');
+                    console.error('Token validation failed');
+                    return;
+                }
+                
+                console.log('Team validated:', currentTeam);
+                teamBadge.textContent = `🎯 ${currentTeam}`;
+                
+                // Request location permission immediately
+                const locationGranted = await requestLocationPermission();
+                
+                if (locationGranted) {
+                    captureBtn.style.display = 'block';
+                    showStatus(`Welcome, ${currentTeam}! Ready to capture photos.`, 'success');
+                    console.log('Location permission granted');
+                } else {
+                    showStatus('Location access is required. Please enable location permissions and reload the page.', 'error');
+                    console.error('Location permission denied');
+                }
+            } catch (error) {
+                console.error('Initialization error:', error);
                 teamBadge.textContent = '❌ Error';
                 teamBadge.style.background = '#f44336';
-                return;
-            }
-            
-            currentTeam = await validateToken(currentToken);
-            
-            if (!currentTeam) {
-                teamBadge.textContent = '❌ Invalid Token';
-                teamBadge.style.background = '#f44336';
-                showStatus('Invalid or disabled token. Please contact the event organizer.', 'error');
-                return;
-            }
-            
-            teamBadge.textContent = `🎯 ${currentTeam}`;
-            
-            // Request location permission immediately
-            const locationGranted = await requestLocationPermission();
-            
-            if (locationGranted) {
-                captureBtn.style.display = 'block';
-                showStatus(`Welcome, ${currentTeam}! Ready to capture photos.`, 'success');
-            } else {
-                showStatus('Location access is required. Please enable location permissions and reload the page.', 'error');
+                showStatus(`Initialization error: ${error.message}`, 'error');
             }
         }
 
