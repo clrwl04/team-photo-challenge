@@ -13,7 +13,7 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #667eea 0%, #7413dc 100%);
             min-height: 100vh;
             padding: 20px;
         }
@@ -42,7 +42,7 @@
         .team-badge {
             display: inline-block;
             padding: 10px 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #667eea 0%, #7413dc 100%);
             color: white;
             border-radius: 25px;
             font-weight: 600;
@@ -288,7 +288,7 @@
         </div>
 
         <div class="location-info" id="locationInfo">
-            <h3>📍 Location Captured</h3>
+            <h3>📍 Claiming Location</h3>
             <p id="coordinates"></p>
             <p id="timestamp"></p>
         </div>
@@ -318,12 +318,30 @@
             firebase: {
                 apiKey: "AIzaSyC2u62B4yUyLJmLH1IdI8tJEp6iHruPH0A",
                 authDomain: "team-photo-challenge.firebaseapp.com",
-                projectId: "team-photo-challenge",
+                projectId: "team-photo-challengeD",
                 storageBucket: "team-photo-challenge.firebasestorage.app",
                 messagingSenderId: "818498843878",
                 appId: "1:818498843878:web:c94a7e2f46798277c9f727",
                 databaseURL: "https://team-photo-challenge-default-rtdb.firebaseio.com/"
             }
+        };
+
+        // TEST MODE - Set to true for testing on desktop without GPS
+        // This will use fake coordinates and show test validation results
+        // Can also be activated by adding &test=true to URL
+        let TEST_MODE = false; // Change to true for testing
+        
+        // Check URL for test parameter
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('test') === 'true') {
+            TEST_MODE = true;
+        }
+        
+        // Test coordinates (only used if TEST_MODE = true)
+        const TEST_COORDINATES = {
+            latitude: 51.5856,
+            longitude: 0.2236,
+            accuracy: 10
         };
 
         const video = document.getElementById('videoElement');
@@ -392,6 +410,11 @@
         }
 
         async function requestLocationPermission() {
+            if (TEST_MODE) {
+                showStatus('⚠️ TEST MODE: Using fake GPS coordinates', 'success');
+                return true; // Always return true in test mode
+            }
+            
             return new Promise((resolve) => {
                 if (!navigator.geolocation) {
                     resolve(false);
@@ -473,6 +496,11 @@
 
         async function initApp() {
             try {
+                if (TEST_MODE) {
+                    console.log('⚠️ TEST MODE ENABLED');
+                    console.log('Test coordinates:', TEST_COORDINATES);
+                }
+                
                 teamBadge.textContent = 'Checking token...';
                 
                 const urlParams = new URLSearchParams(window.location.search);
@@ -513,12 +541,17 @@
                 console.log('Team validated:', currentTeam);
                 teamBadge.textContent = `🎯 ${currentTeam}`;
                 
+                if (TEST_MODE) {
+                    teamBadge.textContent = `🎯 ${currentTeam} (TEST)`;
+                }
+                
                 // Request location permission immediately
                 const locationGranted = await requestLocationPermission();
                 
-                if (locationGranted) {
+                if (locationGranted || TEST_MODE) {
                     captureBtn.style.display = 'block';
-                    showStatus(`Welcome, ${currentTeam}! Ready to capture photos.`, 'success');
+                    const modeMsg = TEST_MODE ? ' (Test Mode Active)' : '';
+                    showStatus(`Welcome, ${currentTeam}! Ready to capture photos.${modeMsg}`, 'success');
                     console.log('Location permission granted');
                 } else {
                     showStatus('Location access is required. Please enable location permissions and reload the page.', 'error');
@@ -566,6 +599,11 @@
         }
 
         async function getLocation() {
+            if (TEST_MODE) {
+                console.log('TEST MODE: Returning fake coordinates');
+                return Promise.resolve(TEST_COORDINATES);
+            }
+            
             return new Promise((resolve, reject) => {
                 if (!navigator.geolocation) {
                     reject(new Error('Geolocation not supported'));
@@ -689,24 +727,92 @@
             return newSubmissionRef.key;
         }
 
+        async function pollSubmissionStatus(submissionId) {
+            console.log('Starting to poll submission status for ID:', submissionId);
+            showStatus('Waiting for validation...', 'info');
+            
+            const submissionRef = dbRef(database, `submissions/${submissionId}`);
+            let pollCount = 0;
+            const maxPolls = 60; // 60 seconds maximum wait
+            
+            return new Promise((resolve) => {
+                const pollInterval = setInterval(async () => {
+                    pollCount++;
+                    console.log(`Polling attempt ${pollCount}/${maxPolls} for submission ${submissionId}`);
+                    
+                    try {
+                        const snapshot = await get(submissionRef);
+                        
+                        if (snapshot.exists()) {
+                            const data = snapshot.val();
+                            console.log('Submission data:', data);
+                            
+                            if (data.validated !== undefined) {
+                                clearInterval(pollInterval);
+                                console.log('Validation received:', data.validated);
+                                
+                                if (data.validated === true) {
+                                    console.log('Photo VALIDATED! Points:', data.pointsAwarded);
+                                    const pointsMsg = data.pointsAwarded ? ` (+${data.pointsAwarded} points!)` : '';
+                                    showResultModal(
+                                        true,
+                                        '🎉 Success!',
+                                        `Your photo was validated!${pointsMsg}\n\nLocation: ${data.locationName || 'Unknown'}\n\nGreat work, ${currentTeam}!`
+                                    );
+                                } else if (data.validated === false) {
+                                    console.log('Photo NOT VALIDATED. Reason:', data.reason);
+                                    showResultModal(
+                                        false,
+                                        '❌ Not Validated',
+                                        `Your photo could not be validated.\n\nReason: ${data.reason || 'Location mismatch'}\n\nPlease try again at the correct location.`
+                                    );
+                                }
+                                resolve(data.validated);
+                            } else {
+                                console.log('Validated field not yet set');
+                            }
+                        } else {
+                            console.log('Submission not found in database');
+                        }
+                    } catch (err) {
+                        console.error('Polling error:', err);
+                    }
+                    
+                    // Timeout after maxPolls attempts
+                    if (pollCount >= maxPolls) {
+                        clearInterval(pollInterval);
+                        console.log('Polling timeout reached');
+                        showResultModal(
+                            false,
+                            '⏱️ Timeout',
+                            'Validation is taking longer than expected.\n\nYour submission was saved but not yet validated.\n\nPlease check back later.'
+                        );
+                        resolve('timeout');
+                    }
+                }, 1000); // Poll every 1 second
+            });
+        }
+
         async function handleSubmit() {
             try {
                 showSpinner(true);
                 showStatus('Uploading photo to Firebase Storage...', 'info');
+                console.log('Starting photo upload...');
 
                 const photoUrl = await uploadToFirebase();
+                console.log('Photo uploaded successfully:', photoUrl);
                 
                 showStatus('Saving submission to database...', 'info');
                 const submissionId = await saveSubmissionToDatabase(photoUrl);
+                console.log('Submission saved with ID:', submissionId);
 
-                showStatus(`✅ Successfully submitted for ${currentTeam}! (ID: ${submissionId})`, 'success');
-                showSpinner(false);
-
-                setTimeout(() => {
-                    retake();
-                }, 3000);
+                showStatus('Photo submitted! Waiting for validation...', 'info');
+                
+                // Start polling for status
+                await pollSubmissionStatus(submissionId);
 
             } catch (err) {
+                console.error('Submission error:', err);
                 showSpinner(false);
                 showStatus(`Submission error: ${err.message}`, 'error');
             }
