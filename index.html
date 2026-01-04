@@ -227,13 +227,13 @@
         // CONFIGURATION - Replace with your values
         const CONFIG = {
             firebase: {
-                apiKey: "AIzaSyC2u62B4yUyLJmLH1IdI8tJEp6iHruPH0A",
-                authDomain: "team-photo-challenge.firebaseapp.com",
-                projectId: "team-photo-challenge",
-                storageBucket: "team-photo-challenge.firebasestorage.app",
-                messagingSenderId: "818498843878",
-                appId: "1:818498843878:web:c94a7e2f46798277c9f727",
-                databaseURL: "https://team-photo-challenge-default-rtdb.firebaseio.com/"
+                apiKey: "YOUR_API_KEY",
+                authDomain: "YOUR_PROJECT.firebaseapp.com",
+                projectId: "YOUR_PROJECT_ID",
+                storageBucket: "YOUR_PROJECT.appspot.com",
+                messagingSenderId: "YOUR_SENDER_ID",
+                appId: "YOUR_APP_ID",
+                databaseURL: "https://YOUR_PROJECT.firebaseio.com"
             }
         };
 
@@ -324,22 +324,36 @@
             try {
                 showSpinner(true);
                 showStatus('Validating access token...', 'info');
+                console.log('Validating token:', token);
+                console.log('Database URL:', CONFIG.firebase.databaseURL);
                 
                 const tokenRef = dbRef(database, `tokens/${token}`);
+                console.log('Token ref path:', `tokens/${token}`);
+                
                 const snapshot = await get(tokenRef);
+                console.log('Token snapshot exists:', snapshot.exists());
                 
                 if (snapshot.exists()) {
                     const data = snapshot.val();
+                    console.log('Token data:', data);
+                    
                     if (data.enabled !== false) {
                         showSpinner(false);
+                        console.log('Token valid, team name:', data.teamName);
                         return data.teamName;
+                    } else {
+                        console.log('Token is disabled');
                     }
+                } else {
+                    console.log('Token does not exist in database');
                 }
                 
                 showSpinner(false);
                 return null;
             } catch (err) {
                 showSpinner(false);
+                console.error('Token validation error:', err);
+                console.error('Error details:', err.message, err.code);
                 showStatus(`Validation error: ${err.message}`, 'error');
                 return null;
             }
