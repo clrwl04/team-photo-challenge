@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Photo Challenge - Leaderboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div id="authScreen" class="auth-screen">
+            <h1>🏆 Team Photo Challenge</h1>
+            <p>Validating access...</p>
+            <div class="spinner"></div>
+            <div id="authError" class="auth-error" style="display: none;"></div>
+        </div>
+
+        <div id="leaderboardContent" class="leaderboard-content">
+            <div class="header">
+                <h1>🏆 Team Photo Challenge</h1>
+                <p class="subtitle">Live Leaderboard</p>
+                <p class="last-update" id="lastUpdate">Click refresh to load</p>
+                
+                <div class="refresh-controls">
+                    <button id="refreshBtn" class="refresh-button">🔄 Refresh Now</button>
+                    
+                    <select id="throttleSelect" class="throttle-select">
+                        <option value="0" selected>Manual only</option>
+                        <option value="60000">Auto 1min</option>
+                        <option value="120000">Auto 2min</option>
+                        <option value="300000">Auto 5min</option>
+                    </select>
+
+                    <span class="rate-limit-warning">⚠️ Min 30s between requests</span>
+                </div>
+            </div>
+
+            <div id="errorMessage" class="error-message" style="display: none;"></div>
+
+            <div class="leaderboard" id="leaderboard">
+                <div class="no-data">Click "🔄 Refresh Now" to load leaderboard</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="spinner"></div>
+    </div>
+
+    <div id="imageModal" class="image-modal">
+        <div class="image-modal-content">
+            <button class="modal-close" onclick="closeImageModal()">✕</button>
+            <img id="modalImage" src="" alt="Claim photo">
+            <div class="image-modal-info">
+                <h3 id="modalLocation"></h3>
+                <p id="modalTeam"></p>
+                <p id="modalPoints"></p>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getDatabase, ref as dbRef, get, onValue, off } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+
+        const CONFIG = {
+            firebase: {
+                apiKey: "AIzaSyC2u62B4yUyLJmLH1IdI8tJEp6iHruPH0A",
+                authDomain: "team-photo-challenge.firebaseapp.com",
+                projectId: "team-photo-challenge",
+                storageBucket: "team-photo-challenge.firebasestorage.app",
+                messagingSenderId: "818498843878",
+                appId: "1:818498843878:web:c94a7e2f46798277c9f727",
+                databaseURL: "https://team-photo-challenge-default-rtdb.firebaseio.com/"
+            }
+        };
+
+        const MIN_REQUEST_INTERVAL = 30000;
+        let lastRequestTime = 0;
+        let requestCount = 0;
+        let rateLimitResetTime = Date.now() + 3600000;
+
+        let app = null;
+        let database = null;
+        let lastUpdateTime = null;
+        let firebaseListener = null;
+        let viewerToken = null;
+        let isAuthenticated = false;
+
+        async function initFirebase() {
+            try {
+                app = initializeApp(CONFIG.firebase);
+                database = getDatabase(app);
+                console.log('Firebase initialized');
+                return true;
+            } catch (err) {
+                console.error('Firebase error:', err);
+                showAuthError(`Firebase initialization failed: ${err.message}`);
+                return false;
+            }
+        }
+
+        async function validateViewerToken(token) {
+            try {
+                const tokenRef = dbRef(database, `viewerTokens/${token}`);
+                const snapshot = await get(tokenRef);
+                
+                if (snapshot.exists() && snapshot.val().enabled !== false) {
+                    return true;
+                }
+                return false;
+            } catch (err) {
+                console.error('Token validation error:', err);
+                showAuthError(`Validation error: ${err.message}`);
+                return false;
+            }
+        }
+
+        function showAuthError(message) {
+            const authScreen = document.getElementById('authScreen');
+            const authError = document.getElementById('authError');
+            
+            authScreen.querySelector('.spinner').style.display = 'none';
+            authScreen.querySelector('p').textContent = 'Access Denied';
+            authError.textContent = message;
+            authError.style.display = 'block';
+        }
+
+        function showLeaderboard() {
+            document.getElementById('authScreen').style.display = 'none';
+            document.getElementById('leaderboardContent').style.display = 'block';
+        }
+
+        function checkRateLimit() {
+            const now = Date.now();
+            const timeSinceLastRequest = now - lastRequestTime;
+            
+            if (now >= rateLimitResetTime) {
+                requestCount = 0;
+                rateLimitResetTime = now + 3600000;
+            }
+            
+            if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
+                const waitTime = Math.ceil((MIN_REQUEST_INTERVAL - timeSinceLastRequest) / 1000);
+                throw new Error(`Rate limited: Please wait ${waitTime} more seconds`);
+            }
+            
+            lastRequestTime = now;
+            requestCount++;
+        }
+
+        async function fetchLeaderboardData(fromListener = false) {
+            try {
+                if (!isAuthenticated) {
+                    throw new Error('Not authenticated');
+                }
+
+                if (!fromListener) {
+                    checkRateLimit();
+                }
+                
+                const teamsRef = dbRef(database, 'teams');
+                const teamsSnapshot = await get(teamsRef);
+                
+                const claimsRef = dbRef(database, 'claims');
+                const claimsSnapshot = await get(claimsRef);
+                
+                const teamData = {};
+
+                if (teamsSnapshot.exists()) {
+                    const teamsData = teamsSnapshot.val();
+                    Object.entries(teamsData).forEach(([teamName, teamInfo]) => {
+                        teamData[teamName] = {
+                            teamName: teamName,
+                            finalScore: teamInfo.score || 0,
+                            totalPoints: 0,
+                            pointsDeducted: 0,
+                            claimsCount: 0,
+                            latestClaim: null
+                        };
+                    });
+                }
+
+                if (claimsSnapshot.exists()) {
+                    const claimsData = claimsSnapshot.val();
+                    
+                    Object.entries(claimsData).forEach(([claimId, claim]) => {
+                        const teamName = claim.teamName;
+
+                        if (!teamData[teamName]) {
+                            teamData[teamName] = {
+                                teamName: teamName,
+                                finalScore: 0,
+                                totalPoints: 0,
+                                pointsDeducted: 0,
+                                claimsCount: 0,
+                                latestClaim: null
+                            };
+                        }
+
+                        teamData[teamName].totalPoints += claim.pointsValue || 0;
+                        teamData[teamName].pointsDeducted += claim.pointsDeducted || 0;
+                        teamData[teamName].claimsCount += 1;
+
+                        if (!teamData[teamName].latestClaim || claim.claimedAt > teamData[teamName].latestClaim.claimedAt) {
+                            teamData[teamName].latestClaim = {
+                                claimId: claimId,
+                                locationName: claim.locationName,
+                                photoUrl: claim.photoUrl,
+                                pointsValue: claim.pointsValue,
+                                pointsDeducted: claim.pointsDeducted,
+                                timestamp: claim.timestamp,
+                                claimedAt: claim.claimedAt
+                            };
+                        }
+                    });
+                }
+
+                const leaderboard = Object.values(teamData);
+                leaderboard.sort((a, b) => b.finalScore - a.finalScore);
+
+                return leaderboard;
+
+            } catch (err) {
+                console.error('Error fetching data:', err);
+                if (err.message.includes('Rate limited')) {
+                    showError(err.message);
+                } else {
+                    showError(`Error loading data: ${err.message}`);
+                }
+                throw err;
+            }
+        }
+
+        function renderLeaderboard(data) {
+            const leaderboard = document.getElementById('leaderboard');
+
+            if (!data || data.length === 0) {
+                leaderboard.innerHTML = '<div class="no-data">No teams registered yet.</div>';
+                return;
+            }
+
+            let html = '';
+
+            data.forEach((team, index) => {
+                const rank = index + 1;
+                const rankClass = `rank-${rank <= 3 ? rank : ''}`;
+                const latestClaim = team.latestClaim;
+
+                html += `
+                    <div class="team-card ${rankClass}">
+                        <div class="rank-badge">${rank}</div>
+                        <div class="team-info">
+                            <div class="team-name">${escapeHtml(team.teamName)}</div>
+                            <div class="team-stats">
+                                <div class="stat">
+                                    <span>📍</span>
+                                    <span class="stat-value">${team.claimsCount}</span>
+                                    <span>location${team.claimsCount !== 1 ? 's' : ''}</span>
+                                </div>
+                                <div class="stat">
+                                    <span>⭐</span>
+                                    <span class="stat-value">${team.totalPoints}</span>
+                                    <span>earned</span>
+                                </div>
+                                ${team.pointsDeducted > 0 ? `
+                                <div class="stat">
+                                    <span>💡</span>
+                                    <span class="stat-value">-${team.pointsDeducted}</span>
+                                    <span>hints</span>
+                                </div>
+                                ` : ''}
+                            </div>
+                            ${latestClaim ? `
+                            <div class="latest-claim">
+                                <div class="latest-claim-title">Latest Claim:</div>
+                                <div class="claim-thumbnail" onclick="showImageModal('${latestClaim.photoUrl}', '${escapeHtml(latestClaim.locationName)}', '${escapeHtml(team.teamName)}', ${latestClaim.pointsValue}, ${latestClaim.pointsDeducted})">
+                                    <img src="${latestClaim.photoUrl}" alt="${escapeHtml(latestClaim.locationName)}" loading="lazy">
+                                    <div class="claim-overlay">
+                                        <div class="claim-location">${escapeHtml(latestClaim.locationName)}</div>
+                                        <div class="claim-points">+${latestClaim.pointsValue}${latestClaim.pointsDeducted > 0 ? ` (-${latestClaim.pointsDeducted})` : ''}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            ` : ''}
+                        </div>
+                        <div class="team-score">
+                            <div class="score-value">${team.finalScore}</div>
+                            <div class="score-label">Points</div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            leaderboard.innerHTML = html;
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            setTimeout(() => errorDiv.style.display = 'none', 5000);
+        }
+
+        function hideError() {
+            document.getElementById('errorMessage').style.display = 'none';
+        }
+
+        function updateLastUpdateTime() {
+            const lastUpdateDiv = document.getElementById('lastUpdate');
+            if (lastUpdateTime) {
+                const now = new Date();
+                const diffSeconds = Math.floor((now - lastUpdateTime) / 1000);
+                
+                let timeStr;
+                if (diffSeconds < 60) {
+                    timeStr = 'Just now';
+                } else if (diffSeconds < 3600) {
+                    const minutes = Math.floor(diffSeconds / 60);
+                    timeStr = `${minutes} minute${minutes !== 1 ? 's' : ''} ago`;
+                } else {
+                    timeStr = lastUpdateTime.toLocaleTimeString();
+                }
+                
+                lastUpdateDiv.textContent = `Last updated: ${timeStr}`;
+            }
+        }
+
+        async function refreshLeaderboard(showLoading = false, fromListener = false) {
+            const refreshBtn = document.getElementById('refreshBtn');
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            
+            refreshBtn.disabled = true;
+            if (showLoading) loadingOverlay.classList.add('show');
+            
+            hideError();
+            
+            try {
+                const data = await fetchLeaderboardData(fromListener);
+                renderLeaderboard(data);
+                lastUpdateTime = new Date();
+                updateLastUpdateTime();
+            } catch (err) {
+                // Error already displayed
+            }
+            
+            refreshBtn.disabled = false;
+            if (showLoading) loadingOverlay.classList.remove('show');
+        }
+
+        function setupFirebaseListener() {
+            if (firebaseListener) {
+                off(firebaseListener);
+                firebaseListener = null;
+            }
+
+            const throttleSelect = document.getElementById('throttleSelect');
+            const interval = parseInt(throttleSelect.value);
+            
+            if (interval > 0) {
+                const teamsRef = dbRef(database, 'teams');
+                firebaseListener = onValue(teamsRef, () => {
+                    refreshLeaderboard(false, true);
+                }, (error) => {
+                    console.error('Listener error:', error);
+                    showError('Live updates disconnected. Use manual refresh.');
+                });
+            }
+        }
+
+        function setupAutoRefresh() {
+            document.getElementById('throttleSelect').addEventListener('change', setupFirebaseListener);
+        }
+
+        window.showImageModal = function(photoUrl, locationName, teamName, pointsValue, pointsDeducted) {
+            const modal = document.getElementById('imageModal');
+            document.getElementById('modalImage').src = photoUrl;
+            document.getElementById('modalLocation').textContent = locationName;
+            document.getElementById('modalTeam').textContent = `Claimed by: ${teamName}`;
+            document.getElementById('modalPoints').textContent = `Points: +${pointsValue}${pointsDeducted > 0 ? ` (-${pointsDeducted} for hints)` : ''}`;
+            modal.classList.add('show');
+        };
+
+        window.closeImageModal = function() {
+            document.getElementById('imageModal').classList.remove('show');
+        };
+
+        document.getElementById('imageModal').addEventListener('click', function(e) {
+            if (e.target === this) closeImageModal();
+        });
+
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+
+        async function initApp() {
+            const initialized = await initFirebase();
+            if (!initialized) return;
+
+            const urlParams = new URLSearchParams(window.location.search);
+            viewerToken = urlParams.get('token');
+            
+            if (!viewerToken) {
+                showAuthError('No access token provided. Please use a valid leaderboard link.');
+                return;
+            }
+            
+            const isValid = await validateViewerToken(viewerToken);
+            
+            if (!isValid) {
+                showAuthError('Invalid or disabled access token. Please contact the event organizer.');
+                return;
+            }
+            
+            isAuthenticated = true;
+            showLeaderboard();
+            
+            setupAutoRefresh();
+            setInterval(updateLastUpdateTime, 10000);
+            
+            document.getElementById('refreshBtn').addEventListener('click', () => {
+                refreshLeaderboard(true, false);
+            });
+        }
+
+        initApp();
+    </script>
+</body>
+</html>
