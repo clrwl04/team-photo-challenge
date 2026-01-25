@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Photo Submission</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="photo-submission">
+    <div class="container photo-container">
+        <div class="header photo-header">
+            <h1>📸 Team Photo Challenge</h1>
+            <div class="team-badge" id="teamBadge">Initializing...</div>
+            <p class="subtitle">Capture and submit photos with location</p>
+        </div>
+
+        <div class="status" id="status"></div>
+        <div class="spinner" id="spinner"></div>
+
+        <div class="camera-section">
+            <video id="videoElement" autoplay playsinline></video>
+            <canvas id="canvas"></canvas>
+            <div class="preview-container">
+                <img id="preview" alt="Captured photo">
+            </div>
+        </div>
+
+        <div class="location-info" id="locationInfo">
+            <h3>📍 Claiming Location</h3>
+            <p id="coordinates"></p>
+            <p id="timestamp"></p>
+        </div>
+
+        <button id="captureBtn" class="button button-primary" style="display: none;">📷 Start Camera</button>
+        <button id="retakeBtn" class="button button-secondary" style="display: none;">🔄 Retake Photo</button>
+        <button id="submitBtn" class="button button-success" style="display: none;">✅ Submit Photo</button>
+    </div>
+
+    <!-- Result Modal -->
+    <div id="resultModal" class="result-modal">
+        <div class="result-content">
+            <div id="resultIcon" class="result-icon"></div>
+            <div id="resultTitle" class="result-title"></div>
+            <div id="resultMessage" class="result-message"></div>
+            <button id="resultButton" class="result-button"></button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
+        import { getDatabase, ref as dbRef, get, push, set, onValue, off } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+
+        // CONFIGURATION - Replace with your values
+        const CONFIG = {
+            firebase: {
+                apiKey: "AIzaSyC2u62B4yUyLJmLH1IdI8tJEp6iHruPH0A",
+                authDomain: "team-photo-challenge.firebaseapp.com",
+                projectId: "team-photo-challengeD",
+                storageBucket: "team-photo-challenge.firebasestorage.app",
+                messagingSenderId: "818498843878",
+                appId: "1:818498843878:web:c94a7e2f46798277c9f727",
+                databaseURL: "https://team-photo-challenge-default-rtdb.firebaseio.com/"
+            }
+        };
+
+        // TEST MODE - Set to true for testing on desktop without GPS
+        // This will use fake coordinates and show test validation results
+        // Can also be activated by adding &test=true to URL
+        let TEST_MODE = false; // Change to true for testing
+        
+        // Check URL for test parameter
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('test') === 'true') {
+            TEST_MODE = true;
+        }
+        
+        // Test coordinates (only used if TEST_MODE = true)
+        const TEST_COORDINATES = {
+            latitude: 51.5856,
+            longitude: 0.2236,
+            accuracy: 10
+        };
+
+        const video = document.getElementById('videoElement');
+        const canvas = document.getElementById('canvas');
+        const preview = document.getElementById('preview');
+        const captureBtn = document.getElementById('captureBtn');
+        const retakeBtn = document.getElementById('retakeBtn');
+        const submitBtn = document.getElementById('submitBtn');
+        const status = document.getElementById('status');
+        const locationInfo = document.getElementById('locationInfo');
+        const spinner = document.getElementById('spinner');
+        const teamBadge = document.getElementById('teamBadge');
+        const resultModal = document.getElementById('resultModal');
+        const resultIcon = document.getElementById('resultIcon');
+        const resultTitle = document.getElementById('resultTitle');
+        const resultMessage = document.getElementById('resultMessage');
+        const resultButton = document.getElementById('resultButton');
+
+        let stream = null;
+        let app = null;
+        let storage = null;
+        let database = null;
+        let currentTeam = null;
+        let currentToken = null;
+        let locationPermissionGranted = false;
+
+        let capturedData = {
+            photoBlob: null,
+            latitude: null,
+            longitude: null,
+            timestamp: null
+        };
+
+        function showStatus(message, type) {
+            status.textContent = message;
+            status.className = `status ${type}`;
+            status.style.display = 'block';
+            
+            if (type === 'success' || type === 'info') {
+                setTimeout(() => {
+                    status.style.display = 'none';
+                }, 5000);
+            }
+        }
+
+        function showSpinner(show) {
+            spinner.style.display = show ? 'block' : 'none';
+        }
+
+        function showResultModal(success, title, message) {
+            resultModal.classList.add('show');
+            resultIcon.textContent = success ? '🎉' : '❌';
+            resultTitle.textContent = title;
+            resultMessage.textContent = message;
+            resultButton.textContent = success ? 'Take Another Photo' : 'Try Again';
+            resultButton.className = `result-button ${success ? 'success' : 'error'}`;
+            
+            // Hide spinner and status when showing modal
+            showSpinner(false);
+            status.style.display = 'none';
+        }
+
+        function hideResultModal() {
+            resultModal.classList.remove('show');
+            retake();
+        }
+
+        async function requestLocationPermission() {
+            if (TEST_MODE) {
+                showStatus('⚠️ TEST MODE: Using fake GPS coordinates', 'success');
+                return true; // Always return true in test mode
+            }
+            
+            return new Promise((resolve) => {
+                if (!navigator.geolocation) {
+                    resolve(false);
+                    return;
+                }
+
+                showStatus('Requesting location permission...', 'info');
+                
+                navigator.geolocation.getCurrentPosition(
+                    () => {
+                        locationPermissionGranted = true;
+                        showStatus('Location permission granted ✔', 'success');
+                        resolve(true);
+                    },
+                    (error) => {
+                        locationPermissionGranted = false;
+                        showStatus('Location permission denied. You must allow location access to submit photos.', 'error');
+                        resolve(false);
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 0
+                    }
+                );
+            });
+        }
+
+        async function initFirebase() {
+            try {
+                app = initializeApp(CONFIG.firebase);
+                storage = getStorage(app);
+                database = getDatabase(app);
+                return true;
+            } catch (err) {
+                showStatus(`Firebase initialization failed: ${err.message}`, 'error');
+                return false;
+            }
+        }
+
+        async function validateToken(token) {
+            try {
+                showSpinner(true);
+                showStatus('Validating access token...', 'info');
+                console.log('Validating token:', token);
+                console.log('Database URL:', CONFIG.firebase.databaseURL);
+                
+                const tokenRef = dbRef(database, `tokens/${token}`);
+                console.log('Token ref path:', `tokens/${token}`);
+                
+                const snapshot = await get(tokenRef);
+                console.log('Token snapshot exists:', snapshot.exists());
+                
+                if (snapshot.exists()) {
+                    const data = snapshot.val();
+                    console.log('Token data:', data);
+                    
+                    if (data.enabled !== false) {
+                        showSpinner(false);
+                        console.log('Token valid, team name:', data.teamName);
+                        return data.teamName;
+                    } else {
+                        console.log('Token is disabled');
+                    }
+                } else {
+                    console.log('Token does not exist in database');
+                }
+                
+                showSpinner(false);
+                return null;
+            } catch (err) {
+                showSpinner(false);
+                console.error('Token validation error:', err);
+                console.error('Error details:', err.message, err.code);
+                showStatus(`Validation error: ${err.message}`, 'error');
+                return null;
+            }
+        }
+
+        async function initApp() {
+            try {
+                if (TEST_MODE) {
+                    console.log('⚠️ TEST MODE ENABLED');
+                    console.log('Test coordinates:', TEST_COORDINATES);
+                }
+                
+                teamBadge.textContent = 'Checking token...';
+                
+                const urlParams = new URLSearchParams(window.location.search);
+                currentToken = urlParams.get('token');
+                
+                if (!currentToken) {
+                    teamBadge.textContent = '❌ No Token';
+                    teamBadge.style.background = '#f44336';
+                    showStatus('No access token provided. Please scan a valid QR code.', 'error');
+                    console.error('No token in URL');
+                    return;
+                }
+                
+                console.log('Token found:', currentToken);
+                teamBadge.textContent = 'Connecting to Firebase...';
+                
+                const initialized = await initFirebase();
+                if (!initialized) {
+                    teamBadge.textContent = '❌ Firebase Error';
+                    teamBadge.style.background = '#f44336';
+                    console.error('Firebase initialization failed');
+                    return;
+                }
+                
+                console.log('Firebase initialized successfully');
+                teamBadge.textContent = 'Validating token...';
+                
+                currentTeam = await validateToken(currentToken);
+                
+                if (!currentTeam) {
+                    teamBadge.textContent = '❌ Invalid Token';
+                    teamBadge.style.background = '#f44336';
+                    showStatus('Invalid or disabled token. Please contact the event organizer.', 'error');
+                    console.error('Token validation failed');
+                    return;
+                }
+                
+                console.log('Team validated:', currentTeam);
+                teamBadge.textContent = `🎯 ${currentTeam}`;
+                
+                if (TEST_MODE) {
+                    teamBadge.textContent = `🎯 ${currentTeam} (TEST)`;
+                }
+                
+                // Request location permission immediately
+                const locationGranted = await requestLocationPermission();
+                
+                if (locationGranted || TEST_MODE) {
+                    captureBtn.style.display = 'block';
+                    const modeMsg = TEST_MODE ? ' (Test Mode Active)' : '';
+                    showStatus(`Welcome, ${currentTeam}! Ready to capture photos.${modeMsg}`, 'success');
+                    console.log('Location permission granted');
+                } else {
+                    showStatus('Location access is required. Please enable location permissions and reload the page.', 'error');
+                    console.error('Location permission denied');
+                }
+            } catch (error) {
+                console.error('Initialization error:', error);
+                teamBadge.textContent = '❌ Error';
+                teamBadge.style.background = '#f44336';
+                showStatus(`Initialization error: ${error.message}`, 'error');
+            }
+        }
+
+        async function startCamera() {
+            try {
+                showSpinner(true);
+                showStatus('Requesting camera access...', 'info');
+                
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'environment' },
+                    audio: false 
+                });
+                
+                video.srcObject = stream;
+                video.style.display = 'block';
+                captureBtn.textContent = '📸 Capture Photo';
+                showStatus('Camera ready! Position your shot and click Capture.', 'success');
+                showSpinner(false);
+            } catch (err) {
+                showSpinner(false);
+                let errorMsg = 'Camera access error: ';
+                
+                if (err.name === 'NotAllowedError') {
+                    errorMsg += 'Permission denied. Please allow camera access in your browser settings.';
+                } else if (err.name === 'NotFoundError') {
+                    errorMsg += 'No camera found on this device.';
+                } else if (err.name === 'NotReadableError') {
+                    errorMsg += 'Camera is being used by another app.';
+                } else {
+                    errorMsg += err.message;
+                }
+                
+                showStatus(errorMsg, 'error');
+            }
+        }
+
+        async function getLocation() {
+            if (TEST_MODE) {
+                console.log('TEST MODE: Returning fake coordinates');
+                return Promise.resolve(TEST_COORDINATES);
+            }
+            
+            return new Promise((resolve, reject) => {
+                if (!navigator.geolocation) {
+                    reject(new Error('Geolocation not supported'));
+                    return;
+                }
+
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        resolve({
+                            latitude: position.coords.latitude,
+                            longitude: position.coords.longitude
+                        });
+                    },
+                    (error) => {
+                        reject(new Error(`Location error: ${error.message}`));
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 0
+                    }
+                );
+            });
+        }
+
+        async function capturePhoto() {
+            if (!stream) {
+                await startCamera();
+                return;
+            }
+
+            try {
+                showSpinner(true);
+                showStatus('Getting current location...', 'info');
+
+                const location = await getLocation();
+                
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0);
+                
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                const base64Data = dataUrl.split(',')[1];
+                const byteString = atob(base64Data);
+                const ab = new ArrayBuffer(byteString.length);
+                const ia = new Uint8Array(ab);
+                for (let i = 0; i < byteString.length; i++) {
+                    ia[i] = byteString.charCodeAt(i);
+                }
+                capturedData.photoBlob = new Blob([ab], { type: 'image/jpeg' });
+                
+                capturedData.latitude = location.latitude;
+                capturedData.longitude = location.longitude;
+                capturedData.timestamp = new Date().toISOString();
+
+                stream.getTracks().forEach(track => track.stop());
+                video.style.display = 'none';
+                stream = null;
+
+                preview.src = dataUrl;
+                preview.style.display = 'block';
+
+                document.getElementById('coordinates').textContent = 
+                    `Lat: ${location.latitude.toFixed(6)}, Lng: ${location.longitude.toFixed(6)}`;
+                document.getElementById('timestamp').textContent = 
+                    `Time: ${new Date(capturedData.timestamp).toLocaleString()}`;
+                locationInfo.style.display = 'block';
+
+                captureBtn.style.display = 'none';
+                retakeBtn.style.display = 'block';
+                submitBtn.style.display = 'block';
+
+                showStatus('Photo and location captured! Review and submit.', 'success');
+                showSpinner(false);
+
+            } catch (err) {
+                showSpinner(false);
+                showStatus(`Error: ${err.message}`, 'error');
+            }
+        }
+
+        function retake() {
+            preview.style.display = 'none';
+            locationInfo.style.display = 'none';
+            retakeBtn.style.display = 'none';
+            submitBtn.style.display = 'none';
+            captureBtn.style.display = 'block';
+            captureBtn.textContent = '📷 Start Camera';
+            capturedData = {
+                photoBlob: null,
+                latitude: null,
+                longitude: null,
+                timestamp: null
+            };
+        }
+
+        async function uploadToFirebase() {
+            const filename = `${currentTeam.replace(/\s+/g, '_')}_${Date.now()}.jpg`;
+            const photoRef = storageRef(storage, `photos/${filename}`);
+            
+            await uploadBytes(photoRef, capturedData.photoBlob);
+            const downloadURL = await getDownloadURL(photoRef);
+            
+            return downloadURL;
+        }
+
+        async function saveSubmissionToDatabase(photoUrl) {
+            const submissionData = {
+                teamName: currentTeam,
+                photoUrl: photoUrl,
+                latitude: capturedData.latitude,
+                longitude: capturedData.longitude,
+                timestamp: capturedData.timestamp
+            };
+
+            const submissionsRef = dbRef(database, 'submissions');
+            const newSubmissionRef = push(submissionsRef);
+            await set(newSubmissionRef, submissionData);
+            
+            return newSubmissionRef.key;
+        }
+
+        async function pollSubmissionStatus(submissionId) {
+            console.log('Starting to poll submission status for ID:', submissionId);
+            showStatus('Waiting for validation...', 'info');
+            
+            const submissionRef = dbRef(database, `submissions/${submissionId}`);
+            let pollCount = 0;
+            const maxPolls = 60; // 60 seconds maximum wait
+            
+            return new Promise((resolve) => {
+                const pollInterval = setInterval(async () => {
+                    pollCount++;
+                    console.log(`Polling attempt ${pollCount}/${maxPolls} for submission ${submissionId}`);
+                    
+                    try {
+                        const snapshot = await get(submissionRef);
+                        
+                        if (snapshot.exists()) {
+                            const data = snapshot.val();
+                            console.log('Submission data:', data);
+                            
+                            if (data.validated !== undefined) {
+                                clearInterval(pollInterval);
+                                console.log('Validation received:', data.validated);
+                                
+                                if (data.validated === true) {
+                                    console.log('Photo VALIDATED! Points:', data.pointsAwarded);
+                                    const pointsMsg = data.pointsAwarded ? ` (+${data.pointsAwarded} points!)` : '';
+                                    showResultModal(
+                                        true,
+                                        '🎉 Success!',
+                                        `Your photo was validated!${pointsMsg}\n\nLocation: ${data.locationName || 'Unknown'}\n\nGreat work, ${currentTeam}!`
+                                    );
+                                } else if (data.validated === false) {
+                                    console.log('Photo NOT VALIDATED. Reason:', data.reason);
+                                    showResultModal(
+                                        false,
+                                        '❌ Not Validated',
+                                        `Your photo could not be validated.\n\nReason: ${data.reason || 'Location mismatch'}\n\nPlease try again at the correct location.`
+                                    );
+                                }
+                                resolve(data.validated);
+                            } else {
+                                console.log('Validated field not yet set');
+                            }
+                        } else {
+                            console.log('Submission not found in database');
+                        }
+                    } catch (err) {
+                        console.error('Polling error:', err);
+                    }
+                    
+                    // Timeout after maxPolls attempts
+                    if (pollCount >= maxPolls) {
+                        clearInterval(pollInterval);
+                        console.log('Polling timeout reached');
+                        showResultModal(
+                            false,
+                            '⏱️ Timeout',
+                            'Validation is taking longer than expected.\n\nYour submission was saved but not yet validated.\n\nPlease check back later.'
+                        );
+                        resolve('timeout');
+                    }
+                }, 1000); // Poll every 1 second
+            });
+        }
+
+        async function handleSubmit() {
+            try {
+                showSpinner(true);
+                showStatus('Uploading photo to Firebase Storage...', 'info');
+                console.log('Starting photo upload...');
+
+                const photoUrl = await uploadToFirebase();
+                console.log('Photo uploaded successfully:', photoUrl);
+                
+                showStatus('Saving submission to database...', 'info');
+                const submissionId = await saveSubmissionToDatabase(photoUrl);
+                console.log('Submission saved with ID:', submissionId);
+
+                showStatus('Photo submitted! Waiting for validation...', 'info');
+                
+                // Start polling for status
+                await pollSubmissionStatus(submissionId);
+
+            } catch (err) {
+                console.error('Submission error:', err);
+                showSpinner(false);
+                showStatus(`Submission error: ${err.message}`, 'error');
+            }
+        }
+
+        captureBtn.addEventListener('click', capturePhoto);
+        retakeBtn.addEventListener('click', retake);
+        submitBtn.addEventListener('click', handleSubmit);
+        resultButton.addEventListener('click', hideResultModal);
+
+        initApp();
+    </script>
+</body>
+</html>
