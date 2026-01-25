@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="shared_styles.css">
 </head>
 <body class="hint-page">
   <div class="container hint-container">
@@ -36,9 +36,12 @@
 
     const firebaseConfig = {
       apiKey: "AIzaSyC2u62B4yUyLJmLH1IdI8tJEp6iHruPH0A",
+      authDomain: "team-photo-challenge.firebaseapp.com",
       projectId: "team-photo-challenge",
+      storageBucket: "team-photo-challenge.firebasestorage.app",
+      messagingSenderId: "818498843878",
       appId: "1:818498843878:web:c94a7e2f46798277c9f727",
-      databaseURL: "https://team-photo-challenge-default-rtdb.firebaseio.com"
+      databaseURL: "https://team-photo-challenge-default-rtdb.firebaseio.com/"
     };
 
     const app = initializeApp(firebaseConfig);
@@ -73,7 +76,7 @@
       } else {
         costInfo.classList.remove('already-unlocked');
         const cost = data.cost || 0;
-        costInfo.textContent = `This hint has cost you ${cost} and been deducted from your score.`;
+        costInfo.textContent = `This hint has cost you ${cost} points and been deducted from your score.`;
       }
     }
 
@@ -82,7 +85,38 @@
       document.getElementById('error').classList.remove('hidden');
       document.getElementById('errorMessage').textContent = message;
     }
-
+    
+        async function validateToken(tokenId) {
+      try {
+        console.log('Validating token:', tokenId);
+        const tokenRef = ref(database, `tokens/${tokenId}`);
+        const snapshot = await get(tokenRef);
+        
+        if (!snapshot.exists()) {
+          console.log('Token does not exist');
+          return null;
+        }
+        
+        const tokenData = snapshot.val();
+        console.log('Token data:', tokenData);
+        
+        if (tokenData.enabled === false) {
+          console.log('Token is disabled');
+          return null;
+        }
+        
+        if (tokenData.role !== 'requester') {
+          console.log('Token role is not requester:', tokenData.role);
+          throw new Error('Viewer tokens cannot request hints. Only requester tokens have this permission.');
+        }
+        
+        return tokenData;
+      } catch (err) {
+        console.error('Token validation error:', err);
+        throw err;
+      }
+    }
+    
     async function requestHintData() {
       const params = getUrlParams();
 
@@ -94,15 +128,21 @@
       showLoading();
 
       try {
-        // Fetch team name from database
-        const teamNameRef = ref(database, `tokens/${params.tokenId}/teamName`);
-        const teamNameSnapshot = await get(teamNameRef);
-        const teamName = teamNameSnapshot.exists() ? teamNameSnapshot.val() : 'Team';
+        // Step 1: Validate the token
+        const tokenData = await validateToken(params.tokenId);
+        
+        if (!tokenData) {
+          showError('Invalid or disabled token. Please check your link and try again.');
+          return;
+        }
+
+        const teamName = tokenData.teamName || 'Team';
+        console.log('Token validated for team:', teamName);
 
         // Update the title with team name
         document.getElementById('pageTitle').textContent = `${teamName}'s Hint`;
         
-        // Request the hint
+        // Step 2: Call the Cloud Function with the token
         const requestHint = httpsCallable(functions, "requestHint");
         const result = await requestHint({
           tokenId: params.tokenId,
@@ -110,10 +150,26 @@
           hintId: params.hintId
         });
 
+        console.log('Hint result:', result.data);
         showHint(result.data);
+
       } catch (err) {
-        showError(err.message || 'An unexpected error occurred');
         console.error('Error:', err);
+
+// Provide more helpful error messages
+        if (err.message.includes('Viewer tokens')) {
+          showError('Permission denied. Viewer tokens cannot request hints. Only requester tokens can unlock hints.');
+        } else if (err.code === 'unauthenticated') {
+          showError('Authentication failed. Please check your token and try again.');
+        } else if (err.code === 'permission-denied') {
+          showError('Permission denied. This token does not have access to request hints.');
+        } else if (err.code === 'not-found') {
+          showError('Location or hint not found. Please check your link.');
+        } else if (err.code === 'invalid-argument') {
+          showError('Invalid request parameters. Please check your link.');
+        } else {
+          showError(err.message || 'An unexpected error occurred. Please try again.');
+        }
       }
     }
 
