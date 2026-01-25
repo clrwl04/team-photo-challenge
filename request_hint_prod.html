@@ -89,7 +89,7 @@
         async function validateToken(tokenId) {
       try {
         console.log('Validating token:', tokenId);
-        const tokenRef = ref(database, `tokens/${tokenId}`);
+        const tokenRef = ref(database, `requesterTokens/${tokenId}`);
         const snapshot = await get(tokenRef);
         
         if (!snapshot.exists()) {
