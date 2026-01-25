@@ -4,493 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Team Photo Challenge - Leaderboard</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #7413dc 0%, #088486 100%);
-            min-height: 100vh;
-            padding: 10px;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
-        .auth-screen {
-            background: white;
-            border-radius: 15px;
-            padding: 40px;
-            max-width: 500px;
-            margin: 100px auto;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
-            text-align: center;
-        }
-
-        .auth-screen h1 {
-            color: #7413dc;
-            font-size: 28px;
-            margin-bottom: 15px;
-        }
-
-        .auth-screen p {
-            color: #666;
-            margin-bottom: 20px;
-        }
-
-        .auth-error {
-            background: #ffebee;
-            color: #c62828;
-            padding: 12px;
-            border-radius: 8px;
-            margin-bottom: 15px;
-            font-size: 14px;
-        }
-
-        .spinner {
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #7413dc;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 20px auto;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .leaderboard-content {
-            display: none;
-        }
-
-        .header {
-            background: white;
-            border-radius: 12px;
-            padding: 12px 15px;
-            margin-bottom: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            text-align: center;
-        }
-
-        h1 {
-            color: #7413dc;
-            font-size: 22px;
-            margin-bottom: 4px;
-            font-weight: 800;
-        }
-
-        .subtitle {
-            color: #088486;
-            font-size: 13px;
-            margin-bottom: 6px;
-            font-weight: 600;
-        }
-
-        .last-update {
-            color: #666;
-            font-size: 11px;
-            font-style: italic;
-            margin-bottom: 8px;
-        }
-
-        .refresh-controls {
-            display: flex;
-            gap: 8px;
-            justify-content: center;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-
-        .refresh-button {
-            padding: 8px 16px;
-            background: linear-gradient(135deg, #7413dc 0%, #088486 100%);
-            color: white;
-            border: none;
-            border-radius: 6px;
-            font-size: 12px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .refresh-button:hover:not(:disabled) {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(116, 19, 220, 0.4);
-        }
-
-        .refresh-button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .throttle-select {
-            padding: 8px 12px;
-            border: 2px solid #7413dc;
-            border-radius: 6px;
-            font-size: 12px;
-            font-weight: 600;
-            background: white;
-            color: #7413dc;
-            cursor: pointer;
-        }
-
-        .rate-limit-warning {
-            display: inline-block;
-            padding: 6px 12px;
-            background: #fff3cd;
-            border: 2px solid #ffc107;
-            border-radius: 6px;
-            font-size: 11px;
-            font-weight: 600;
-            color: #856404;
-        }
-
-        .leaderboard {
-            background: white;
-            border-radius: 12px;
-            padding: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            margin-bottom: 12px;
-        }
-
-        .team-card {
-            display: flex;
-            align-items: center;
-            padding: 12px;
-            margin-bottom: 10px;
-            background: linear-gradient(135deg, #f0e6ff 0%, #e0f7f7 100%);
-            border-radius: 10px;
-            transition: all 0.3s;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .team-card:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 6px 20px rgba(0,0,0,0.1);
-        }
-
-        .team-card.rank-1 {
-            background: linear-gradient(135deg, #ffd700 0%, #ffe066 100%);
-            border: 3px solid #d4af37;
-        }
-
-        .team-card.rank-2 {
-            background: linear-gradient(135deg, #c0c0c0 0%, #e0e0e0 100%);
-            border: 3px solid #a0a0a0;
-        }
-
-        .team-card.rank-3 {
-            background: linear-gradient(135deg, #cd7f32 0%, #e89b4e 100%);
-            border: 3px solid #8b5a2b;
-        }
-
-        .rank-badge {
-            font-size: 28px;
-            font-weight: 800;
-            color: rgba(0,0,0,0.2);
-            min-width: 45px;
-            text-align: center;
-        }
-
-        .team-card.rank-1 .rank-badge,
-        .team-card.rank-2 .rank-badge,
-        .team-card.rank-3 .rank-badge {
-            color: rgba(0,0,0,0.3);
-        }
-
-        .team-info {
-            flex: 1;
-            margin-left: 12px;
-        }
-
-        .team-name {
-            font-size: 18px;
-            font-weight: 700;
-            color: #7413dc;
-            margin-bottom: 4px;
-        }
-
-        .team-stats {
-            display: flex;
-            gap: 15px;
-            flex-wrap: wrap;
-            font-size: 13px;
-            color: #666;
-        }
-
-        .stat {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-
-        .stat-value {
-            font-weight: 700;
-            color: #088486;
-        }
-
-        .team-score {
-            text-align: center;
-            min-width: 100px;
-        }
-
-        .score-value {
-            font-size: 32px;
-            font-weight: 800;
-            color: #7413dc;
-            line-height: 1;
-            margin-bottom: 4px;
-        }
-
-        .team-card.rank-1 .score-value {
-            color: #d4af37;
-        }
-
-        .team-card.rank-2 .score-value {
-            color: #8c8c8c;
-        }
-
-        .team-card.rank-3 .score-value {
-            color: #8b4513;
-        }
-
-        .score-label {
-            font-size: 10px;
-            color: #088486;
-            text-transform: uppercase;
-            font-weight: 700;
-            letter-spacing: 0.5px;
-        }
-
-        .latest-claim {
-            margin-top: 10px;
-            padding-top: 10px;
-            border-top: 2px solid rgba(255,255,255,0.3);
-        }
-
-        .latest-claim-title {
-            font-size: 12px;
-            font-weight: 600;
-            color: #666;
-            margin-bottom: 8px;
-        }
-
-        .claim-thumbnail {
-            position: relative;
-            border-radius: 8px;
-            overflow: hidden;
-            max-width: 200px;
-            cursor: pointer;
-            transition: transform 0.3s;
-        }
-
-        .claim-thumbnail:hover {
-            transform: scale(1.05);
-        }
-
-        .claim-thumbnail img {
-            width: 100%;
-            height: auto;
-            display: block;
-        }
-
-        .claim-overlay {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
-            padding: 8px;
-            color: white;
-        }
-
-        .claim-location {
-            font-size: 11px;
-            font-weight: 600;
-            margin-bottom: 2px;
-        }
-
-        .claim-points {
-            font-size: 10px;
-            opacity: 0.9;
-        }
-
-        .loading-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.5);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-        }
-
-        .loading-overlay.show {
-            display: flex;
-        }
-
-        .error-message {
-            background: #ffebee;
-            color: #c62828;
-            padding: 12px;
-            border-radius: 8px;
-            margin-bottom: 12px;
-            text-align: center;
-            font-size: 13px;
-        }
-
-        .no-data {
-            text-align: center;
-            padding: 30px;
-            color: #999;
-            font-size: 16px;
-        }
-
-        .image-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.95);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 2000;
-            padding: 20px;
-        }
-
-        .image-modal.show {
-            display: flex;
-        }
-
-        .image-modal-content {
-            max-width: 90%;
-            max-height: 90%;
-            position: relative;
-        }
-
-        .image-modal-content img {
-            max-width: 100%;
-            max-height: 80vh;
-            border-radius: 10px;
-        }
-
-        .image-modal-info {
-            background: white;
-            padding: 15px;
-            border-radius: 10px;
-            margin-top: 10px;
-            text-align: center;
-        }
-
-        .image-modal-info h3 {
-            color: #7413dc;
-            margin-bottom: 5px;
-        }
-
-        .image-modal-info p {
-            color: #666;
-            font-size: 14px;
-        }
-
-        .modal-close {
-            position: absolute;
-            top: -40px;
-            right: 0;
-            background: white;
-            border: none;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            font-size: 24px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        @media (max-width: 768px) {
-            h1 {
-                font-size: 18px;
-            }
-
-            .subtitle {
-                font-size: 12px;
-            }
-
-            .team-card {
-                flex-direction: column;
-                text-align: center;
-                padding: 12px;
-            }
-
-            .rank-badge {
-                font-size: 24px;
-                min-width: auto;
-            }
-
-            .team-info {
-                margin-left: 0;
-                margin-top: 8px;
-            }
-
-            .team-name {
-                font-size: 16px;
-            }
-
-            .team-stats {
-                justify-content: center;
-                font-size: 12px;
-            }
-
-            .team-score {
-                margin-top: 8px;
-            }
-
-            .score-value {
-                font-size: 28px;
-            }
-
-            .refresh-controls {
-                flex-direction: column;
-                width: 100%;
-            }
-
-            .refresh-button,
-            .throttle-select,
-            .rate-limit-warning {
-                width: 100%;
-            }
-
-            .claim-thumbnail {
-                margin: 0 auto;
-            }
-
-            .auth-screen {
-                margin: 50px auto;
-                padding: 30px 20px;
-            }
-        }
-    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="container">
-        <!-- Authentication Screen -->
         <div id="authScreen" class="auth-screen">
             <h1>🏆 Team Photo Challenge</h1>
             <p>Validating access...</p>
@@ -498,7 +18,6 @@
             <div id="authError" class="auth-error" style="display: none;"></div>
         </div>
 
-        <!-- Leaderboard Content (hidden until authenticated) -->
         <div id="leaderboardContent" class="leaderboard-content">
             <div class="header">
                 <h1>🏆 Team Photo Challenge</h1>
@@ -510,7 +29,7 @@
                     
                     <select id="throttleSelect" class="throttle-select">
                         <option value="0" selected>Manual only</option>
-                        <option value="60000">Auto 1min (Firebase listener)</option>
+                        <option value="60000">Auto 1min</option>
                         <option value="120000">Auto 2min</option>
                         <option value="300000">Auto 5min</option>
                     </select>
@@ -547,12 +66,11 @@
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
         import { getDatabase, ref as dbRef, get, onValue, off } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
 
-        // CONFIGURATION
         const CONFIG = {
             firebase: {
                 apiKey: "AIzaSyC2u62B4yUyLJmLH1IdI8tJEp6iHruPH0A",
                 authDomain: "team-photo-challenge.firebaseapp.com",
-                projectId: "team-photo-challengeD",
+                projectId: "team-photo-challenge",
                 storageBucket: "team-photo-challenge.firebasestorage.app",
                 messagingSenderId: "818498843878",
                 appId: "1:818498843878:web:c94a7e2f46798277c9f727",
@@ -560,7 +78,6 @@
             }
         };
 
-        // Rate limiting
         const MIN_REQUEST_INTERVAL = 30000;
         let lastRequestTime = 0;
         let requestCount = 0;
@@ -568,48 +85,32 @@
 
         let app = null;
         let database = null;
-        let refreshInterval = null;
         let lastUpdateTime = null;
         let firebaseListener = null;
         let viewerToken = null;
         let isAuthenticated = false;
 
-        // Initialize Firebase
         async function initFirebase() {
             try {
                 app = initializeApp(CONFIG.firebase);
                 database = getDatabase(app);
-                console.log('Firebase initialized successfully');
+                console.log('Firebase initialized');
                 return true;
             } catch (err) {
-                console.error('Firebase initialization error:', err);
+                console.error('Firebase error:', err);
                 showAuthError(`Firebase initialization failed: ${err.message}`);
                 return false;
             }
         }
 
-        // Validate viewer token
         async function validateViewerToken(token) {
             try {
-                console.log('Validating viewer token...');
-                
                 const tokenRef = dbRef(database, `viewerTokens/${token}`);
                 const snapshot = await get(tokenRef);
                 
-                if (snapshot.exists()) {
-                    const data = snapshot.val();
-                    console.log('Token data:', data);
-                    
-                    if (data.enabled !== false) {
-                        console.log('Viewer token valid');
-                        return true;
-                    } else {
-                        console.log('Token is disabled');
-                    }
-                } else {
-                    console.log('Token does not exist in database');
+                if (snapshot.exists() && snapshot.val().enabled !== false) {
+                    return true;
                 }
-                
                 return false;
             } catch (err) {
                 console.error('Token validation error:', err);
@@ -618,7 +119,6 @@
             }
         }
 
-        // Show authentication error
         function showAuthError(message) {
             const authScreen = document.getElementById('authScreen');
             const authError = document.getElementById('authError');
@@ -629,13 +129,11 @@
             authError.style.display = 'block';
         }
 
-        // Show leaderboard (authenticated)
         function showLeaderboard() {
             document.getElementById('authScreen').style.display = 'none';
             document.getElementById('leaderboardContent').style.display = 'block';
         }
 
-        // Check rate limit
         function checkRateLimit() {
             const now = Date.now();
             const timeSinceLastRequest = now - lastRequestTime;
@@ -643,7 +141,6 @@
             if (now >= rateLimitResetTime) {
                 requestCount = 0;
                 rateLimitResetTime = now + 3600000;
-                console.log('Rate limit counter reset');
             }
             
             if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
@@ -653,10 +150,8 @@
             
             lastRequestTime = now;
             requestCount++;
-            console.log(`Manual request #${requestCount} this hour`);
         }
 
-        // Fetch leaderboard data
         async function fetchLeaderboardData(fromListener = false) {
             try {
                 if (!isAuthenticated) {
@@ -667,64 +162,70 @@
                     checkRateLimit();
                 }
                 
-                console.log('Fetching leaderboard data...');
+                const teamsRef = dbRef(database, 'teams');
+                const teamsSnapshot = await get(teamsRef);
                 
                 const claimsRef = dbRef(database, 'claims');
                 const claimsSnapshot = await get(claimsRef);
                 
-                if (!claimsSnapshot.exists()) {
-                    console.log('No claims data found');
-                    return [];
-                }
-
-                const claimsData = claimsSnapshot.val();
-                console.log('Claims data fetched');
-
                 const teamData = {};
 
-                Object.entries(claimsData).forEach(([claimId, claim]) => {
-                    const teamName = claim.teamName;
-
-                    if (!teamData[teamName]) {
+                if (teamsSnapshot.exists()) {
+                    const teamsData = teamsSnapshot.val();
+                    Object.entries(teamsData).forEach(([teamName, teamInfo]) => {
                         teamData[teamName] = {
                             teamName: teamName,
+                            finalScore: teamInfo.score || 0,
                             totalPoints: 0,
                             pointsDeducted: 0,
-                            finalScore: 0,
                             claimsCount: 0,
                             latestClaim: null
                         };
-                    }
+                    });
+                }
 
-                    teamData[teamName].totalPoints += claim.pointsValue || 0;
-                    teamData[teamName].pointsDeducted += claim.pointsDeducted || 0;
-                    teamData[teamName].claimsCount += 1;
+                if (claimsSnapshot.exists()) {
+                    const claimsData = claimsSnapshot.val();
+                    
+                    Object.entries(claimsData).forEach(([claimId, claim]) => {
+                        const teamName = claim.teamName;
 
-                    if (!teamData[teamName].latestClaim || claim.claimedAt > teamData[teamName].latestClaim.claimedAt) {
-                        teamData[teamName].latestClaim = {
-                            claimId: claimId,
-                            locationName: claim.locationName,
-                            photoUrl: claim.photoUrl,
-                            pointsValue: claim.pointsValue,
-                            pointsDeducted: claim.pointsDeducted,
-                            timestamp: claim.timestamp,
-                            claimedAt: claim.claimedAt
-                        };
-                    }
-                });
+                        if (!teamData[teamName]) {
+                            teamData[teamName] = {
+                                teamName: teamName,
+                                finalScore: 0,
+                                totalPoints: 0,
+                                pointsDeducted: 0,
+                                claimsCount: 0,
+                                latestClaim: null
+                            };
+                        }
 
-                Object.values(teamData).forEach(team => {
-                    team.finalScore = team.totalPoints - team.pointsDeducted;
-                });
+                        teamData[teamName].totalPoints += claim.pointsValue || 0;
+                        teamData[teamName].pointsDeducted += claim.pointsDeducted || 0;
+                        teamData[teamName].claimsCount += 1;
+
+                        if (!teamData[teamName].latestClaim || claim.claimedAt > teamData[teamName].latestClaim.claimedAt) {
+                            teamData[teamName].latestClaim = {
+                                claimId: claimId,
+                                locationName: claim.locationName,
+                                photoUrl: claim.photoUrl,
+                                pointsValue: claim.pointsValue,
+                                pointsDeducted: claim.pointsDeducted,
+                                timestamp: claim.timestamp,
+                                claimedAt: claim.claimedAt
+                            };
+                        }
+                    });
+                }
 
                 const leaderboard = Object.values(teamData);
                 leaderboard.sort((a, b) => b.finalScore - a.finalScore);
 
-                console.log('Leaderboard data processed');
                 return leaderboard;
 
             } catch (err) {
-                console.error('Error fetching leaderboard data:', err);
+                console.error('Error fetching data:', err);
                 if (err.message.includes('Rate limited')) {
                     showError(err.message);
                 } else {
@@ -734,12 +235,11 @@
             }
         }
 
-        // Render leaderboard
         function renderLeaderboard(data) {
             const leaderboard = document.getElementById('leaderboard');
 
             if (!data || data.length === 0) {
-                leaderboard.innerHTML = '<div class="no-data">No teams have claimed locations yet. Be the first!</div>';
+                leaderboard.innerHTML = '<div class="no-data">No teams registered yet.</div>';
                 return;
             }
 
@@ -802,9 +302,7 @@
             const errorDiv = document.getElementById('errorMessage');
             errorDiv.textContent = message;
             errorDiv.style.display = 'block';
-            setTimeout(() => {
-                errorDiv.style.display = 'none';
-            }, 5000);
+            setTimeout(() => errorDiv.style.display = 'none', 5000);
         }
 
         function hideError() {
@@ -836,16 +334,13 @@
             const loadingOverlay = document.getElementById('loadingOverlay');
             
             refreshBtn.disabled = true;
-            if (showLoading) {
-                loadingOverlay.classList.add('show');
-            }
+            if (showLoading) loadingOverlay.classList.add('show');
             
             hideError();
             
             try {
                 const data = await fetchLeaderboardData(fromListener);
                 renderLeaderboard(data);
-                
                 lastUpdateTime = new Date();
                 updateLastUpdateTime();
             } catch (err) {
@@ -853,9 +348,7 @@
             }
             
             refreshBtn.disabled = false;
-            if (showLoading) {
-                loadingOverlay.classList.remove('show');
-            }
+            if (showLoading) loadingOverlay.classList.remove('show');
         }
 
         function setupFirebaseListener() {
@@ -868,38 +361,26 @@
             const interval = parseInt(throttleSelect.value);
             
             if (interval > 0) {
-                console.log('Setting up Firebase real-time listener');
-                const claimsRef = dbRef(database, 'claims');
-                
-                firebaseListener = onValue(claimsRef, (snapshot) => {
-                    console.log('Firebase listener triggered - data changed');
+                const teamsRef = dbRef(database, 'teams');
+                firebaseListener = onValue(teamsRef, () => {
                     refreshLeaderboard(false, true);
                 }, (error) => {
-                    console.error('Firebase listener error:', error);
+                    console.error('Listener error:', error);
                     showError('Live updates disconnected. Use manual refresh.');
                 });
-            } else {
-                console.log('Manual mode - no listener');
             }
         }
 
         function setupAutoRefresh() {
-            const throttleSelect = document.getElementById('throttleSelect');
-            throttleSelect.addEventListener('change', setupFirebaseListener);
+            document.getElementById('throttleSelect').addEventListener('change', setupFirebaseListener);
         }
 
         window.showImageModal = function(photoUrl, locationName, teamName, pointsValue, pointsDeducted) {
             const modal = document.getElementById('imageModal');
-            const modalImage = document.getElementById('modalImage');
-            const modalLocation = document.getElementById('modalLocation');
-            const modalTeam = document.getElementById('modalTeam');
-            const modalPoints = document.getElementById('modalPoints');
-            
-            modalImage.src = photoUrl;
-            modalLocation.textContent = locationName;
-            modalTeam.textContent = `Claimed by: ${teamName}`;
-            modalPoints.textContent = `Points: +${pointsValue}${pointsDeducted > 0 ? ` (-${pointsDeducted} for hints)` : ''}`;
-            
+            document.getElementById('modalImage').src = photoUrl;
+            document.getElementById('modalLocation').textContent = locationName;
+            document.getElementById('modalTeam').textContent = `Claimed by: ${teamName}`;
+            document.getElementById('modalPoints').textContent = `Points: +${pointsValue}${pointsDeducted > 0 ? ` (-${pointsDeducted} for hints)` : ''}`;
             modal.classList.add('show');
         };
 
@@ -908,9 +389,7 @@
         };
 
         document.getElementById('imageModal').addEventListener('click', function(e) {
-            if (e.target === this) {
-                closeImageModal();
-            }
+            if (e.target === this) closeImageModal();
         });
 
         function escapeHtml(text) {
@@ -924,14 +403,10 @@
             return text.replace(/[&<>"']/g, m => map[m]);
         }
 
-        // Initialize app with authentication
         async function initApp() {
             const initialized = await initFirebase();
-            if (!initialized) {
-                return;
-            }
+            if (!initialized) return;
 
-            // Get viewer token from URL
             const urlParams = new URLSearchParams(window.location.search);
             viewerToken = urlParams.get('token');
             
@@ -940,7 +415,6 @@
                 return;
             }
             
-            // Validate token
             const isValid = await validateViewerToken(viewerToken);
             
             if (!isValid) {
@@ -948,7 +422,6 @@
                 return;
             }
             
-            // Token is valid - show leaderboard
             isAuthenticated = true;
             showLeaderboard();
             
