@@ -42,7 +42,11 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
     import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app-check.js";
+    import { getToken } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app-check.js";
+    import { onTokenChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app-check.js";
 
+    let _hintRequestInProgress = false;
+    let _hintRequestDone = false;
 
     const firebaseConfig = {
       apiKey: "AIzaSyC2u62B4yUyLJmLH1IdI8tJEp6iHruPH0A",
@@ -56,12 +60,27 @@
 
     const app = initializeApp(firebaseConfig);
 
-
     // Enable App Check
-    initializeAppCheck(app, {
-      provider: new ReCaptchaV3Provider("6Le4a10sAAAAAFp9fKY8dPoeHPhJjAGqK_FxOSUu"),
-      isTokenAutoRefreshEnabled: true
+    const appCheck = initializeAppCheck(app, { 
+      provider: new ReCaptchaV3Provider("6Le4a10sAAAAAFp9fKY8dPoeHPhJjAGqK_FxOSUu"), 
+      isTokenAutoRefreshEnabled: true 
     });
+
+    onTokenChanged(appCheck, (token) => {
+      if (!token) {
+        console.warn('App Check token not yet available');
+        return;
+      }
+
+      console.log('App Check token ready (onTokenChanged):', token.token);
+
+      if (!_hintRequestDone && !_hintRequestInProgress) {
+        setTimeout(() => requestHintData(), 50);
+      } else {
+        console.log('requestHintData already done or in progress; not calling again.');
+      }
+    });
+
 
     const database = getDatabase(app);
 
@@ -142,74 +161,81 @@
     }
 
     async function requestHintData() {
+  // One-time guards
+  if (_hintRequestDone) {
+    console.log('requestHintData: already completed, skipping.');
+    return;
+  }
+  if (_hintRequestInProgress) {
+    console.log('requestHintData: already in progress, skipping duplicate call.');
+    return;
+  }
+  _hintRequestInProgress = true;
+  showLoading();
+
+  try {
+    // Inner try handles token/fetch/validation errors
+    try {
       const params = getUrlParams();
-
       if (!params.tokenId || !params.locationId || !params.hintId) {
-        showError('Missing required URL parameters. Please provide tokenId, locationId, and hintId.');
-        return;
+        throw new Error('Missing required URL parameters. Please provide tokenId, locationId, and hintId.');
       }
 
-      showLoading();
-
-      try {
-        // Step 1: Validate the token
-        const tokenData = await validateToken(params.tokenId);
-        
-        if (!tokenData) {
-          showError('Invalid or disabled token. Please check your link and try again.');
-          return;
-        }
-
-        const teamName = tokenData.teamName || 'Team';
-        console.log('Token validated for team:', teamName);
-
-        // Update the title with team name
-        document.getElementById('pageTitle').textContent = `${teamName}'s Hint`;
-        
-        // Step 2: Call the Cloud Function using direct HTTP (not httpsCCallable)
-        const url = 'https://us-central1-team-photo-challenge.cloudfunctions.net/requestHint';
-        
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            data: {
-              tokenId: params.tokenId,
-              locationId: params.locationId,
-              hintId: params.hintId
-            }
-          })
-        });
-
-        const responseBody = await response.json();
-        if (!response.ok) {
-          //const errorData = await response.json();
-          throw new Error(responseBody.error?.message || `HTTP ${response.status}`);
-        }
-
-        //const result = await response.json();
-        console.log('Hint result:', responseBody);
-        
-        // Response is now in result.result instead of result.data
-        showHint(responseBody.result);
-
-      } catch (err) {
-        console.error('Error:', err);
-        
-        // Provide more helpful error messages
-        if (err.message.includes('Viewer tokens')) {
-          showError('Permission denied. Viewer tokens cannot request hints. Only requester tokens can unlock hints.');
-        } else if (err.message.includes('Invalid token')) {
-          showError('Invalid or disabled token. Please check your link and try again.');
-        } else if (err.message.includes('not found')) {
-          showError('Location or hint not found. Please check your link.');
-        } else {
-          showError(err.message || 'An unexpected error occurred. Please try again.');
-        }
+      // Validate DB token (your existing function)
+      const tokenData = await validateToken(params.tokenId);
+      if (!tokenData) {
+        throw new Error('Invalid or disabled token. Please check your link and try again.');
       }
+
+      // DEBUG: force-refresh and attach App Check token explicitly
+      if (!appCheck) {
+        throw new Error('App Check not initialized.');
+      }
+      const appCheckToken = await getToken(appCheck, true);
+      console.log('DEBUG appCheckToken:', appCheckToken?.token);
+
+      // Call Cloud Function with explicit App Check header
+      const url = 'https://us-central1-team-photo-challenge.cloudfunctions.net/requestHint';
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Firebase-AppCheck': appCheckToken.token
+        },
+        body: JSON.stringify({
+          data: {
+            tokenId: params.tokenId,
+            locationId: params.locationId,
+            hintId: params.hintId
+          }
+        })
+      });
+
+      const responseBody = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(responseBody?.error?.message || `HTTP ${response.status}`);
+      }
+
+      console.log('Hint result:', responseBody);
+      showHint(responseBody.result);
+
+    } catch (innerErr) {
+      // Handle token/fetch/validation errors here
+      console.error('requestHintData inner error:', innerErr);
+      const msg = innerErr.message || 'An unexpected error occurred while fetching the hint.';
+      showError(msg);
     }
+
+  } catch (outerErr) {
+    // This should be rare; log it
+    console.error('requestHintData outer error:', outerErr);
+    showError(outerErr.message || 'Unexpected error');
+  } finally {
+    // Always run cleanup so UI doesn't stay stuck
+    _hintRequestInProgress = false;
+    _hintRequestDone = true;
+  }
+}
 
     // TEST FUNCTION - Direct HTTP call
     async function testDirectCall() {
@@ -261,8 +287,9 @@
       }
     }
 
-    window.addEventListener('DOMContentLoaded', requestHintData);
-    
+    // Fires too early
+    // window.addEventListener('DOMContentLoaded', requestHintData);
+
     // Add test button listener
     document.addEventListener('DOMContentLoaded', () => {
       const testBtn = document.getElementById('testDirectBtn');
