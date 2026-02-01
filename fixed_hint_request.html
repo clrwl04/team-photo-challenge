@@ -41,6 +41,8 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+    import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app-check.js";
+
 
     const firebaseConfig = {
       apiKey: "AIzaSyC2u62B4yUyLJmLH1IdI8tJEp6iHruPH0A",
@@ -53,6 +55,13 @@
     };
 
     const app = initializeApp(firebaseConfig);
+
+    // Enable App Check
+    initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider("6Le4a10sAAAAAFp9fKY8dPoeHPhJjAGqK_FxOSUu"),
+      isTokenAutoRefreshEnabled: true
+    });
+
     const database = getDatabase(app);
 
     function getUrlParams() {
@@ -156,7 +165,7 @@
         // Update the title with team name
         document.getElementById('pageTitle').textContent = `${teamName}'s Hint`;
         
-        // Step 2: Call the Cloud Function using direct HTTP (not httpsCallable)
+        // Step 2: Call the Cloud Function using direct HTTP (not httpsCCallable)
         const url = 'https://us-central1-team-photo-challenge.cloudfunctions.net/requestHint';
         
         const response = await fetch(url, {
@@ -183,8 +192,8 @@
         console.log('Hint result:', result);
         
         // Response is now in result.result instead of result.data
-        showHint(result.result);
-        
+        showHint(responseBody.result);
+
       } catch (err) {
         console.error('Error:', err);
         
