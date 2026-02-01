@@ -163,7 +163,7 @@
 
       try {
         // Wait for App Check token
-        const appCheckToken = await getToken(appCheck, false);
+        const appCheckToken = await getToken(appCheck, true);
         console.log("App Check token:", appCheckToken.token);
 
         console.log('app:', app);
@@ -206,6 +206,7 @@
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'X-Firebase-AppCheck': appCheckToken.token
           },
           body: JSON.stringify({
             data: {
