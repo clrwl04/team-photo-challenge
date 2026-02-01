@@ -56,7 +56,6 @@
 
     const app = initializeApp(firebaseConfig);
 
-
     // Enable App Check
     initializeAppCheck(app, {
       provider: new ReCaptchaV3Provider("6Le4a10sAAAAAFp9fKY8dPoeHPhJjAGqK_FxOSUu"),
@@ -190,7 +189,7 @@
         }
 
         //const result = await response.json();
-        console.log('Hint result:', responseBody);
+        console.log("Hint result:", responseBody);
         
         // Response is now in result.result instead of result.data
         showHint(responseBody.result);
