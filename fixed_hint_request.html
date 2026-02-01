@@ -42,11 +42,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
     import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app-check.js";
-    import { getToken } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app-check.js";
-    import { onTokenChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app-check.js";
 
-    let _hintRequestInProgress = false;
-    let _hintRequestDone = false;
 
     const firebaseConfig = {
       apiKey: "AIzaSyC2u62B4yUyLJmLH1IdI8tJEp6iHruPH0A",
@@ -60,27 +56,12 @@
 
     const app = initializeApp(firebaseConfig);
 
+
     // Enable App Check
-    const appCheck = initializeAppCheck(app, { 
-      provider: new ReCaptchaV3Provider("6Le4a10sAAAAAFp9fKY8dPoeHPhJjAGqK_FxOSUu"), 
-      isTokenAutoRefreshEnabled: true 
+    initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider("6Le4a10sAAAAAFp9fKY8dPoeHPhJjAGqK_FxOSUu"),
+      isTokenAutoRefreshEnabled: true
     });
-
-    onTokenChanged(appCheck, (token) => {
-      if (!token) {
-        console.warn('App Check token not yet available');
-        return;
-      }
-
-      console.log('App Check token ready (onTokenChanged):', token.token);
-
-      if (!_hintRequestDone && !_hintRequestInProgress) {
-        setTimeout(() => requestHintData(), 50);
-      } else {
-        console.log('requestHintData already done or in progress; not calling again.');
-      }
-    });
-
 
     const database = getDatabase(app);
 
@@ -161,7 +142,6 @@
     }
 
     async function requestHintData() {
-
       const params = getUrlParams();
 
       if (!params.tokenId || !params.locationId || !params.hintId) {
@@ -172,29 +152,6 @@
       showLoading();
 
       try {
-        // Wait for App Check token
-        const appCheckToken = await getToken(appCheck, true);
-        console.log("App Check token:", appCheckToken.token);
-
-        console.log('app:', app);
-        console.log('appCheck:', appCheck);
-
-        if (!appCheck) {
-          console.error('App Check instance is undefined — cannot get token yet.');
-          showError('App Check not initialized. Try reloading the page.');
-          return;
-        }
-
-        try {
-          const appCheckToken = await getToken(appCheck, false);
-          console.log('App Check token:', appCheckToken?.token);
-        } catch (err) {
-          console.error('getToken error:', err);
-          showError('Failed to obtain App Check token: ' + (err.message || err));
-          return;
-        }
-
-
         // Step 1: Validate the token
         const tokenData = await validateToken(params.tokenId);
         
@@ -216,7 +173,6 @@
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Firebase-AppCheck': appCheckToken.token
           },
           body: JSON.stringify({
             data: {
@@ -234,7 +190,7 @@
         }
 
         //const result = await response.json();
-        console.log("Hint result:", responseBody);
+        console.log('Hint result:', responseBody);
         
         // Response is now in result.result instead of result.data
         showHint(responseBody.result);
@@ -252,9 +208,7 @@
         } else {
           showError(err.message || 'An unexpected error occurred. Please try again.');
         }
-      
       }
-
     }
 
     // TEST FUNCTION - Direct HTTP call
@@ -307,9 +261,8 @@
       }
     }
 
-    // Fires too early
-    // window.addEventListener('DOMContentLoaded', requestHintData);
-
+    window.addEventListener('DOMContentLoaded', requestHintData);
+    
     // Add test button listener
     document.addEventListener('DOMContentLoaded', () => {
       const testBtn = document.getElementById('testDirectBtn');
