@@ -39,7 +39,6 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js";
     import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
     const firebaseConfig = {
@@ -53,7 +52,6 @@
     };
 
     const app = initializeApp(firebaseConfig);
-    const functions = getFunctions(app);
     const database = getDatabase(app);
 
     function getUrlParams() {
@@ -157,16 +155,33 @@
         // Update the title with team name
         document.getElementById('pageTitle').textContent = `${teamName}'s Hint`;
         
-        // Step 2: Call the Cloud Function with the token
-        const requestHint = httpsCallable(functions, "requestHint");
-        const result = await requestHint({
-          tokenId: params.tokenId,
-          locationId: params.locationId,
-          hintId: params.hintId
+        // Step 2: Call the Cloud Function using direct HTTP (not httpsCallable)
+        const url = 'https://us-central1-team-photo-challenge.cloudfunctions.net/requestHint';
+        
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            data: {
+              tokenId: params.tokenId,
+              locationId: params.locationId,
+              hintId: params.hintId
+            }
+          })
         });
 
-        console.log('Hint result:', result.data);
-        showHint(result.data);
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error?.message || `HTTP ${response.status}`);
+        }
+
+        const result = await response.json();
+        console.log('Hint result:', result);
+        
+        // Response is now in result.result instead of result.data
+        showHint(result.result);
         
       } catch (err) {
         console.error('Error:', err);
@@ -174,14 +189,10 @@
         // Provide more helpful error messages
         if (err.message.includes('Viewer tokens')) {
           showError('Permission denied. Viewer tokens cannot request hints. Only requester tokens can unlock hints.');
-        } else if (err.code === 'unauthenticated') {
-          showError('Authentication failed. Please check your token and try again.');
-        } else if (err.code === 'permission-denied') {
-          showError('Permission denied. This token does not have access to request hints.');
-        } else if (err.code === 'not-found') {
+        } else if (err.message.includes('Invalid token')) {
+          showError('Invalid or disabled token. Please check your link and try again.');
+        } else if (err.message.includes('not found')) {
           showError('Location or hint not found. Please check your link.');
-        } else if (err.code === 'invalid-argument') {
-          showError('Invalid request parameters. Please check your link.');
         } else {
           showError(err.message || 'An unexpected error occurred. Please try again.');
         }
