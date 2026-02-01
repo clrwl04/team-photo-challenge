@@ -42,6 +42,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
     import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app-check.js";
+    import { getToken } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app-check.js";
 
 
     const firebaseConfig = {
@@ -151,6 +152,10 @@
       showLoading();
 
       try {
+        // Wait for App Check token
+        const appCheckToken = await getToken(undefined, false);
+        console.log("App Check token:", appCheckToken.token);
+
         // Step 1: Validate the token
         const tokenData = await validateToken(params.tokenId);
         
