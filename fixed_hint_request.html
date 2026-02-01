@@ -163,8 +163,27 @@
 
       try {
         // Wait for App Check token
-        const appCheckToken = await getToken(undefined, false);
+        const appCheckToken = await getToken(appCheck, false);
         console.log("App Check token:", appCheckToken.token);
+
+        console.log('app:', app);
+        console.log('appCheck:', appCheck);
+
+        if (!appCheck) {
+          console.error('App Check instance is undefined — cannot get token yet.');
+          showError('App Check not initialized. Try reloading the page.');
+          return;
+        }
+
+        try {
+          const appCheckToken = await getToken(appCheck, false);
+          console.log('App Check token:', appCheckToken?.token);
+        } catch (err) {
+          console.error('getToken error:', err);
+          showError('Failed to obtain App Check token: ' + (err.message || err));
+          return;
+        }
+
 
         // Step 1: Validate the token
         const tokenData = await validateToken(params.tokenId);
