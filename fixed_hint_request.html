@@ -172,12 +172,13 @@
           })
         });
 
+        const responseBody = await response.json();
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error?.message || `HTTP ${response.status}`);
+          //const errorData = await response.json();
+          throw new Error(responseBody.error?.message || `HTTP ${response.status}`);
         }
 
-        const result = await response.json();
+        //const result = await response.json();
         console.log('Hint result:', result);
         
         // Response is now in result.result instead of result.data
