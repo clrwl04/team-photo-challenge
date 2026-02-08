@@ -51,9 +51,6 @@
   import { getFunctions, httpsCallable } 
     from "https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js?v=4";
 
-  import { getStorage } 
-    from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js?v=4";
-
   /* ------------------------------
      Firebase Config (same as working page)
   ------------------------------ */
@@ -83,11 +80,10 @@
       app = getApp();
     }
 
-    const storage = getStorage(app);
     const db = getDatabase(app);
     const functions = getFunctions(app);
 
-    return { app, storage, db, functions };
+    return { app, db, functions };
   }
 
   /* ------------------------------
